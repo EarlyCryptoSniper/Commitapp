@@ -11,7 +11,7 @@ export function LandingPage() {
         Habit commitment
       </p>
       <h1 className="max-w-full text-3xl font-semibold leading-tight break-words sm:text-4xl">
-        Zet een bedrag vast.
+        Zet een bedrag vast.{" "}
         <br className="hidden sm:block" />
         Doe wat je belooft.
       </h1>
