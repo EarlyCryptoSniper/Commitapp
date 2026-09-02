@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchCommitment } from "../lib/lockin";
+import { fetchCommitment, fetchProofSignedUrl } from "../lib/lockin";
 import {
   PROOF_LABELS,
   STATUS_LABELS,
@@ -11,12 +11,18 @@ import {
 export function CommitmentDetailPage() {
   const { id } = useParams();
   const [item, setItem] = useState<Commitment | null>(null);
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     fetchCommitment(id)
-      .then(setItem)
+      .then(async (row) => {
+        setItem(row);
+        if (row?.status === "completed") {
+          setProofUrl(await fetchProofSignedUrl(row.id));
+        }
+      })
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "Niet gevonden")
       );
@@ -24,6 +30,10 @@ export function CommitmentDetailPage() {
 
   if (error) return <p className="text-sm text-danger">{error}</p>;
   if (!item) return <p className="text-sm text-mute">Laden…</p>;
+
+  const isVideo =
+    item.proof_type === "video" ||
+    Boolean(proofUrl?.includes(".mp4") || proofUrl?.includes(".mov"));
 
   return (
     <section className="pt-4">
@@ -43,6 +53,17 @@ export function CommitmentDetailPage() {
           <dd>{PROOF_LABELS[item.proof_type] ?? item.proof_type}</dd>
         </div>
       </dl>
+
+      {proofUrl && (
+        <div className="mt-6 overflow-hidden rounded-2xl border border-line">
+          {isVideo ? (
+            <video src={proofUrl} controls className="w-full" />
+          ) : (
+            <img src={proofUrl} alt="Bewijs" className="w-full" />
+          )}
+        </div>
+      )}
+
       {item.status === "locked" && (
         <Link
           to={`/commitment/${item.id}/proof`}

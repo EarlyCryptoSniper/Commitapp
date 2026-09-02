@@ -110,6 +110,26 @@ export async function uploadProofFile(input: {
   return path;
 }
 
+export async function fetchProofSignedUrl(
+  commitmentId: string
+): Promise<string | null> {
+  const db = requireSupabase();
+  const { data, error } = await db
+    .from("proofs")
+    .select("storage_path")
+    .eq("commitment_id", commitmentId)
+    .maybeSingle();
+
+  if (error || !data?.storage_path) return null;
+
+  const { data: signed, error: signError } = await db.storage
+    .from("commitment-proofs")
+    .createSignedUrl(data.storage_path, 60 * 30);
+
+  if (signError || !signed?.signedUrl) return null;
+  return signed.signedUrl;
+}
+
 export async function finalizeProof(
   id: string,
   storagePath: string
