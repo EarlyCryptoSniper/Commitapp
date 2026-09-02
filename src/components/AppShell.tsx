@@ -9,13 +9,16 @@ export function AppShell() {
   const { user } = useAuth();
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col">
-      <header className="flex items-center justify-between px-4 py-4">
-        <Link to={user ? "/dashboard" : "/"} className="text-lg font-semibold tracking-tight">
+    <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-lg flex-col">
+      <header className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-4">
+        <Link
+          to={user ? "/dashboard" : "/"}
+          className="shrink-0 text-lg font-semibold tracking-tight"
+        >
           LockIn
         </Link>
         {user ? (
-          <nav className="flex gap-4">
+          <nav className="flex min-w-0 shrink-0 gap-3 sm:gap-4">
             <NavLink to="/dashboard" className={linkClass}>
               Overzicht
             </NavLink>
@@ -27,12 +30,12 @@ export function AppShell() {
             </NavLink>
           </nav>
         ) : (
-          <Link to="/auth" className="text-sm text-accent">
+          <Link to="/auth" className="shrink-0 text-sm text-accent">
             Inloggen
           </Link>
         )}
       </header>
-      <main className="flex-1 px-4 pb-8">
+      <main className="w-full min-w-0 max-w-full flex-1 px-4 pb-8">
         <Outlet />
       </main>
       <Footer />

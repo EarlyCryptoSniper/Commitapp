@@ -6,16 +6,16 @@ export function LandingPage() {
   const { user } = useAuth();
 
   return (
-    <section className="pt-10">
+    <section className="w-full min-w-0 max-w-full pt-10">
       <p className="mb-3 text-xs uppercase tracking-[0.2em] text-mute">
         Habit commitment
       </p>
-      <h1 className="text-4xl font-semibold leading-tight">
+      <h1 className="max-w-full text-3xl font-semibold leading-tight break-words sm:text-4xl">
         Zet een bedrag vast.
-        <br />
+        <br className="hidden sm:block" />
         Doe wat je belooft.
       </h1>
-      <p className="mt-4 max-w-md text-sm leading-6 text-mute">
+      <p className="mt-4 w-full max-w-md text-sm leading-6 text-mute break-words">
         LockIn is geen kansspel. Je wint geen geld van anderen. Als je de
         belofte haalt, blijft je geld van jou. Als je faalt, volgt later een
         servicefee. In deze versie wordt nog niets afgeschreven.
