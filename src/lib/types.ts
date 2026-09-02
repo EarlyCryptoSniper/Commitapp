@@ -3,11 +3,13 @@ export type TaskId =
   | "workout"
   | "no_takeaway"
   | "stretch"
-  | "tiktok_max_1h";
+  | "tiktok_max_1h"
+  | "pushups_10"
+  | "desk_admin";
+
+export type ProofType = "photo" | "photo_pair" | "video";
 
 export type CommitmentStatus = "draft" | "locked" | "completed" | "failed";
-
-export type ProofType = "photo";
 
 export type Profile = {
   id: string;
@@ -36,12 +38,73 @@ export type Proof = {
   submitted_at: string;
 };
 
+export type TaskDef = {
+  id: TaskId;
+  label: string;
+  proofType: ProofType;
+  proofLabel: string;
+  hint: string;
+};
+
+export const TASKS: TaskDef[] = [
+  {
+    id: "pushups_10",
+    label: "10 keer opdrukken",
+    proofType: "video",
+    proofLabel: "Video",
+    hint: "Korte video waarin de 10 herhalingen zichtbaar zijn.",
+  },
+  {
+    id: "workout",
+    label: "Sporten",
+    proofType: "video",
+    proofLabel: "Video",
+    hint: "Korte video van de training of de oefening.",
+  },
+  {
+    id: "desk_admin",
+    label: "Admin / bureau afronden",
+    proofType: "photo_pair",
+    proofLabel: "Foto voor + na",
+    hint: "Eerst een foto van de start, daarna van het resultaat.",
+  },
+  {
+    id: "no_takeaway",
+    label: "Geen takeaway",
+    proofType: "photo",
+    proofLabel: "Foto",
+    hint: "Foto van de zelfgemaakte maaltijd.",
+  },
+  {
+    id: "meditate",
+    label: "Mediteren",
+    proofType: "photo",
+    proofLabel: "Foto",
+    hint: "Foto van de timer of meditatie-app na afloop.",
+  },
+  {
+    id: "stretch",
+    label: "Stretchen",
+    proofType: "photo",
+    proofLabel: "Foto",
+    hint: "Foto waarop je stretcht.",
+  },
+];
+
 export const TASK_LABELS: Record<TaskId, string> = {
   meditate: "Mediteren",
   workout: "Sporten",
   no_takeaway: "Geen takeaway",
   stretch: "Stretchen",
   tiktok_max_1h: "Max 1 uur TikTok",
+  pushups_10: "10 keer opdrukken",
+  desk_admin: "Admin / bureau afronden",
+};
+
+export const PROOF_LABELS: Record<ProofType, string> = {
+  photo: "Foto",
+  photo_pair: "Foto voor + na",
+  video: "Video",
 };
 
 export const STATUS_LABELS: Record<CommitmentStatus, string> = {
@@ -52,10 +115,8 @@ export const STATUS_LABELS: Record<CommitmentStatus, string> = {
 };
 
 export const ALLOWED_AMOUNTS = [500, 1000] as const;
-export const ALLOWED_TASKS: TaskId[] = [
-  "meditate",
-  "workout",
-  "no_takeaway",
-  "stretch",
-  "tiktok_max_1h",
-];
+export const ALLOWED_TASKS = TASKS.map((t) => t.id);
+
+export function taskDef(id: TaskId): TaskDef | undefined {
+  return TASKS.find((t) => t.id === id);
+}

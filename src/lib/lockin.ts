@@ -89,6 +89,27 @@ export async function deleteDraft(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function uploadProofFile(input: {
+  commitmentId: string;
+  file: File;
+  slot: "proof" | "before" | "after";
+}): Promise<string> {
+  const db = requireSupabase();
+  const { data: sessionData } = await db.auth.getUser();
+  const uid = sessionData.user?.id;
+  if (!uid) throw new Error("Niet ingelogd");
+
+  const ext = extFromFile(input.file);
+  const path = `${uid}/${input.commitmentId}/${input.slot}.${ext}`;
+
+  const { error } = await db.storage
+    .from("commitment-proofs")
+    .upload(path, input.file, { upsert: true, contentType: input.file.type });
+
+  if (error) throw error;
+  return path;
+}
+
 export async function finalizeProof(
   id: string,
   storagePath: string
@@ -100,4 +121,17 @@ export async function finalizeProof(
   });
   if (error) throw error;
   return data as Commitment;
+}
+
+function extFromFile(file: File): string {
+  const fromName = file.name.split(".").pop()?.toLowerCase();
+  if (fromName && /^[a-z0-9]+$/.test(fromName) && fromName.length <= 5) {
+    return fromName === "jpg" ? "jpg" : fromName;
+  }
+  if (file.type === "image/jpeg") return "jpg";
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  if (file.type === "video/mp4") return "mp4";
+  if (file.type === "video/quicktime") return "mov";
+  return "bin";
 }

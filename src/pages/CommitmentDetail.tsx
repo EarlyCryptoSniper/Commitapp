@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchCommitment } from "../lib/lockin";
-import { STATUS_LABELS, TASK_LABELS, type Commitment } from "../lib/types";
+import {
+  PROOF_LABELS,
+  STATUS_LABELS,
+  TASK_LABELS,
+  type Commitment,
+} from "../lib/types";
 
 export function CommitmentDetailPage() {
   const { id } = useParams();
@@ -35,7 +40,7 @@ export function CommitmentDetailPage() {
         </div>
         <div className="flex justify-between border-b border-line py-2">
           <dt className="text-mute">Bewijs</dt>
-          <dd>Foto</dd>
+          <dd>{PROOF_LABELS[item.proof_type] ?? item.proof_type}</dd>
         </div>
       </dl>
       {item.status === "locked" && (
