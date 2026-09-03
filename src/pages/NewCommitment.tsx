@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createCommitmentDraft, lockCommitment } from "../lib/lockin";
-import { TASKS, TASK_LABELS, type TaskId } from "../lib/types";
+import { TASKS, TASK_LABELS, taskDef, type TaskId } from "../lib/types";
 
-type Step = "amount" | "task" | "deadline" | "sign" | "done";
+type Step = "amount" | "task" | "deadline" | "contract" | "sign" | "done";
 
 function defaultDeadlineValue() {
   const d = new Date();
@@ -21,7 +21,8 @@ export function NewCommitmentPage() {
 
   const [step, setStep] = useState<Step>("amount");
   const [amount, setAmount] = useState<500 | 1000>(1000);
-  const [task, setTask] = useState<TaskId>("workout");
+  const [task, setTask] = useState<TaskId>("desk_admin");
+  const selected = taskDef(task);
   const [deadlineLocal, setDeadlineLocal] = useState(defaultDeadlineValue);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,10 +172,58 @@ export function NewCommitmentPage() {
             </button>
             <button
               type="button"
-              onClick={() => setStep("sign")}
+              onClick={() => setStep("contract")}
               className="flex-1 rounded-full bg-accent py-3 text-sm font-semibold text-ink"
             >
               Volgende
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === "contract" && selected && (
+        <>
+          <h1 className="text-2xl font-semibold">Bewijscontract</h1>
+          <p className="mt-2 text-sm text-mute">
+            {selected.label} · {selected.proofLabel}. Dit wordt vastgezet bij
+            je handtekening. Geen vrije interpretatie achteraf.
+          </p>
+          <dl className="mt-6 space-y-3 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-mute">Pass</dt>
+              <dd className="mt-1">{selected.contract.pass}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-mute">Fail</dt>
+              <dd className="mt-1">{selected.contract.fail}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-mute">
+                Onvoldoende
+              </dt>
+              <dd className="mt-1">{selected.contract.insufficient}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-mute">
+                Challenge
+              </dt>
+              <dd className="mt-1">{selected.contract.challenge}</dd>
+            </div>
+          </dl>
+          <div className="mt-8 flex gap-3">
+            <button
+              type="button"
+              onClick={() => setStep("deadline")}
+              className="flex-1 rounded-full border border-line py-3 text-sm"
+            >
+              Terug
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("sign")}
+              className="flex-1 rounded-full bg-accent py-3 text-sm font-semibold text-ink"
+            >
+              Ik snap het
             </button>
           </div>
         </>
@@ -193,7 +242,7 @@ export function NewCommitmentPage() {
             ref={canvasRef}
             width={360}
             height={160}
-            className="mt-5 w-full touch-none rounded-2xl border border-line bg-panel"
+            className="mt-5 w-full max-w-full min-w-0 touch-none rounded-2xl border border-line bg-panel"
             onPointerDown={(e) => {
               drawing.current = true;
               canvasRef.current?.getContext("2d")?.beginPath();
@@ -220,7 +269,7 @@ export function NewCommitmentPage() {
           <div className="mt-6 flex gap-3">
             <button
               type="button"
-              onClick={() => setStep("deadline")}
+              onClick={() => setStep("contract")}
               className="flex-1 rounded-full border border-line py-3 text-sm"
             >
               Terug

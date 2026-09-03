@@ -9,7 +9,13 @@ export type TaskId =
 
 export type ProofType = "photo" | "photo_pair" | "video";
 
-export type CommitmentStatus = "draft" | "locked" | "completed" | "failed";
+export type CommitmentStatus =
+  | "draft"
+  | "locked"
+  | "reviewing"
+  | "completed"
+  | "insufficient_evidence"
+  | "failed";
 
 export type Profile = {
   id: string;
@@ -38,67 +44,72 @@ export type Proof = {
   submitted_at: string;
 };
 
+export type EvidenceContract = {
+  pass: string;
+  fail: string;
+  insufficient: string;
+  challenge: string;
+};
+
 export type TaskDef = {
   id: TaskId;
   label: string;
   proofType: ProofType;
   proofLabel: string;
   hint: string;
+  contract: EvidenceContract;
 };
 
 export const TASKS: TaskDef[] = [
+  {
+    id: "desk_admin",
+    label: "Bureau afronden",
+    proofType: "photo_pair",
+    proofLabel: "Foto voor + na",
+    hint: "Eerst de startsituatie, daarna het resultaat met challenge in beeld.",
+    contract: {
+      pass: "Zelfde plek. Voor rommelig of open. Na leger. Challenge leesbaar en geldig.",
+      fail: "Na gelijk of erger, andere ruimte, of verlopen/ontbrekende challenge.",
+      insufficient: "Te donker, andere hoek, challenge onleesbaar, of voor-foto ontbreekt.",
+      challenge: "Na-foto via LockIn-camera. Code 10 min geldig.",
+    },
+  },
   {
     id: "pushups_10",
     label: "10 keer opdrukken",
     proofType: "video",
     proofLabel: "Video",
-    hint: "Korte video waarin de 10 herhalingen zichtbaar zijn.",
-  },
-  {
-    id: "workout",
-    label: "Sporten",
-    proofType: "video",
-    proofLabel: "Video",
-    hint: "Korte video van de training of de oefening.",
-  },
-  {
-    id: "desk_admin",
-    label: "Admin / bureau afronden",
-    proofType: "photo_pair",
-    proofLabel: "Foto voor + na",
-    hint: "Eerst een foto van de start, daarna van het resultaat.",
-  },
-  {
-    id: "no_takeaway",
-    label: "Geen takeaway",
-    proofType: "photo",
-    proofLabel: "Foto",
-    hint: "Foto van de zelfgemaakte maaltijd.",
+    hint: "Eén ononderbroken video. Challenge in de eerste seconden.",
+    contract: {
+      pass: "Eén take. Challenge vooraan geldig. Ongeveer 10 herhalingen zichtbaar.",
+      fail: "Geen oefening, duidelijk geknipt, of andere oefening.",
+      insufficient: "Telling onzeker, lichaam half buiten beeld, of challenge onleesbaar.",
+      challenge: "Video via LockIn-camera. Code 10 min geldig, vooraan in beeld.",
+    },
   },
   {
     id: "meditate",
-    label: "Mediteren",
+    label: "10 min mediteren",
     proofType: "photo",
     proofLabel: "Foto",
-    hint: "Foto van de timer of meditatie-app na afloop.",
-  },
-  {
-    id: "stretch",
-    label: "Stretchen",
-    proofType: "photo",
-    proofLabel: "Foto",
-    hint: "Foto waarop je stretcht.",
+    hint: "Timer of app ≥10:00 plus challenge in hetzelfde kader.",
+    contract: {
+      pass: "Leesbare timer van minstens 10 minuten en geldige challenge.",
+      fail: "Timer onder 10 minuten of geen tijd zichtbaar.",
+      insufficient: "Cijfers onleesbaar of challenge weg.",
+      challenge: "Foto via LockIn-camera. Code 10 min geldig, in hetzelfde kader.",
+    },
   },
 ];
 
 export const TASK_LABELS: Record<TaskId, string> = {
-  meditate: "Mediteren",
+  meditate: "10 min mediteren",
   workout: "Sporten",
   no_takeaway: "Geen takeaway",
   stretch: "Stretchen",
   tiktok_max_1h: "Max 1 uur TikTok",
   pushups_10: "10 keer opdrukken",
-  desk_admin: "Admin / bureau afronden",
+  desk_admin: "Bureau afronden",
 };
 
 export const PROOF_LABELS: Record<ProofType, string> = {
@@ -110,7 +121,9 @@ export const PROOF_LABELS: Record<ProofType, string> = {
 export const STATUS_LABELS: Record<CommitmentStatus, string> = {
   draft: "Concept",
   locked: "Wacht op bewijs",
+  reviewing: "In beoordeling",
   completed: "Voltooid",
+  insufficient_evidence: "Onvoldoende bewijs",
   failed: "Mislukt",
 };
 
