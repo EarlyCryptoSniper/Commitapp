@@ -5,7 +5,8 @@ export type TaskId =
   | "stretch"
   | "tiktok_max_1h"
   | "pushups_10"
-  | "desk_admin";
+  | "desk_admin"
+  | "show_code";
 
 export type ProofType = "photo" | "photo_pair" | "video";
 
@@ -110,6 +111,7 @@ export const TASK_LABELS: Record<TaskId, string> = {
   tiktok_max_1h: "Max 1 uur TikTok",
   pushups_10: "10 keer opdrukken",
   desk_admin: "Bureau afronden",
+  show_code: "Toon de code",
 };
 
 export const PROOF_LABELS: Record<ProofType, string> = {

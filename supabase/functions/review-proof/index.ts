@@ -2,11 +2,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const TASK_CONTRACTS: Record<string, string> = {
   desk_admin:
-    "BEFORE and AFTER photos of the same desk. PASS only if same place, before is messy/open, after is clearly emptier, and challenge LOCKIN XXXX is readable on AFTER. FAIL if after is as messy, different room, or code missing. INSUFFICIENT if dark, bad angle, or unreadable.",
+    "Twee foto's: BEFORE en AFTER. PASS alleen als ALLES waar is: (1) dezelfde plek, (2) AFTER is duidelijk leger/opgeruimder dan BEFORE, (3) LOCKIN XXXX staat leesbaar op AFTER. Als AFTER hetzelfde of voller is: FAILED. Als je maar één foto hebt, of niet kunt zien of het leger is: INSUFFICIENT. Code alleen is NOOIT genoeg voor PASS.",
   meditate:
-    "Photo of a timer/app showing at least 10:00 AND challenge LOCKIN XXXX in the same frame. PASS only if both readable. FAIL if timer under 10 minutes. INSUFFICIENT if unreadable.",
+    "Foto van timer/app minstens 10:00 EN challenge LOCKIN XXXX in hetzelfde kader. PASS alleen als beide leesbaar. FAIL als timer onder 10 minuten. INSUFFICIENT als onleesbaar.",
+  show_code:
+    "PASS alleen als LOCKIN XXXX scherp leesbaar is. FAIL bij andere code. INSUFFICIENT als onleesbaar.",
   pushups_10:
-    "Video is out of scope. overall must be insufficient.",
+    "Video valt buiten deze versie. overall moet insufficient zijn.",
 };
 
 type VerdictResult = "passed" | "failed" | "insufficient";
@@ -57,22 +59,29 @@ Deno.serve(async (req) => {
     const ext = (proof.storage_path.split(".").pop() ?? "").toLowerCase();
     if (["webm", "mp4", "mov"].includes(ext)) {
       await apply(admin, commitmentId, "insufficient", {
-        reason: "Video review is not enabled in this version.",
+        reason: "Video-keuring zit nog niet in deze versie.",
       });
       return json({ ok: true, result: "insufficient" });
     }
 
-    const paths: string[] = [proof.storage_path];
+    const folder = proof.storage_path.split("/").slice(0, 2).join("/");
+    const paths: string[] = [];
     if (commitment.proof_type === "photo_pair") {
-      const folder = proof.storage_path.split("/").slice(0, 2).join("/");
       const { data: objects } = await admin.storage
         .from("commitment-proofs")
         .list(folder);
-      for (const obj of objects ?? []) {
-        if (obj.name.startsWith("before.")) {
-          paths.unshift(`${folder}/${obj.name}`);
-        }
+      const before = (objects ?? []).find((o) => o.name.startsWith("before."));
+      const after = (objects ?? []).find((o) => o.name.startsWith("after."));
+      if (before) paths.push(`${folder}/${before.name}`);
+      if (after) paths.push(`${folder}/${after.name}`);
+      if (paths.length < 2) {
+        await apply(admin, commitmentId, "insufficient", {
+          reason: "Voor- of na-foto ontbreekt.",
+        });
+        return json({ ok: true, result: "insufficient" });
       }
+    } else {
+      paths.push(proof.storage_path);
     }
 
     const imageUrls: { url: string }[] = [];
@@ -90,7 +99,7 @@ Deno.serve(async (req) => {
       : "unknown";
     const contract =
       TASK_CONTRACTS[commitment.task] ??
-      "If unsure return insufficient. Never guess.";
+      "Bij twijfel: insufficient. Nooit raden.";
 
     const ai = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -106,14 +115,14 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              "LockIn referee. Judge only the contract. JSON keys: overall, checklist, reason. overall is passed, failed, or insufficient.",
+              "Je bent een strenge LockIn-scheidsrechter. PASS alleen als elk punt van het contract zichtbaar waar is. Twijfel = insufficient. Nooit cadeau-PASS. reason: één korte Nederlandse zin.",
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Contract:\n${contract}\nChallenge: ${challenge}\nDo not judge the deadline.`,
+                text: `Contract:\n${contract}\nChallenge: ${challenge}\nEerste beeld is BEFORE, tweede is AFTER (als er twee zijn).\nBeoordeel de deadline niet.`,
               },
               ...imageUrls.map((img) => ({
                 type: "image_url",

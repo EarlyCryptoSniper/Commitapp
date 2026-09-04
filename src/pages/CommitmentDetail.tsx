@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   fetchCommitment,
   fetchLatestVerdict,
+  fetchProofSignedUrl,
   requestReview,
   retryProof,
   type VerdictRow,
@@ -28,7 +29,7 @@ function nudge(status: Commitment["status"]): string {
   if (status === "completed") return "Gehaald. Mooi werk.";
   if (status === "insufficient_evidence")
     return "Nog niet overtuigend. Voor de deadline mag je opnieuw.";
-  if (status === "failed") return "Niet gehaald. De volgende telt weer.";
+  if (status === "failed") return "Nog niet gehaald. Voor de deadline mag je opnieuw.";
   return "";
 }
 
@@ -53,6 +54,7 @@ export function CommitmentDetailPage() {
   const { id } = useParams();
   const [item, setItem] = useState<Commitment | null>(null);
   const [verdict, setVerdict] = useState<VerdictRow | null>(null);
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
@@ -67,7 +69,13 @@ export function CommitmentDetailPage() {
     fetchCommitment(id)
       .then(async (row) => {
         setItem(row);
-        if (row) setVerdict(await fetchLatestVerdict(row.id));
+        if (!row) return;
+        setVerdict(await fetchLatestVerdict(row.id));
+        if (row.status !== "draft" && row.status !== "locked") {
+          setProofUrl(await fetchProofSignedUrl(row.id));
+        } else {
+          setProofUrl(null);
+        }
       })
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "Niet gevonden")
@@ -84,7 +92,7 @@ export function CommitmentDetailPage() {
       setItem(next);
       if (next) setVerdict(await fetchLatestVerdict(next.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Keuring mislukt");
+      setError(err instanceof Error ? err.message : JSON.stringify(err));
     } finally {
       setBusy(false);
     }
@@ -97,8 +105,9 @@ export function CommitmentDetailPage() {
     try {
       const next = await retryProof(item.id);
       setItem(next);
+      setProofUrl(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Opnieuw proberen mislukt");
+      setError(err instanceof Error ? err.message : JSON.stringify(err));
     } finally {
       setBusy(false);
     }
@@ -123,6 +132,13 @@ export function CommitmentDetailPage() {
         <p className="mt-4 rounded-2xl border border-line bg-panel px-4 py-3 text-sm">
           {why}
         </p>
+      )}
+      {proofUrl && (
+        <img
+          src={proofUrl}
+          alt="Ingestuurd bewijs"
+          className="mt-4 w-full max-w-full rounded-2xl border border-line"
+        />
       )}
       <dl className="mt-6 space-y-2 text-sm">
         <div className="flex justify-between border-b border-line py-2">
@@ -152,16 +168,17 @@ export function CommitmentDetailPage() {
           {busy ? "Bezig…" : "Opnieuw keuren"}
         </button>
       )}
-      {item.status === "insufficient_evidence" && beforeDeadline && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={tryAgain}
-          className="mt-6 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink disabled:opacity-40"
-        >
-          {busy ? "Bezig…" : "Opnieuw bewijs maken"}
-        </button>
-      )}
+      {(item.status === "insufficient_evidence" || item.status === "failed") &&
+        beforeDeadline && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={tryAgain}
+            className="mt-6 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink disabled:opacity-40"
+          >
+            {busy ? "Bezig…" : "Opnieuw bewijs maken"}
+          </button>
+        )}
     </section>
   );
 }

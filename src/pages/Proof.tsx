@@ -74,18 +74,28 @@ export function ProofPage() {
     }
   }
 
-  async function snap(kind: "proof" | "before" | "after") {
+  async function snap(kind: "proof" | "before" | "after", stamp?: string | null) {
     const video = videoRef.current;
     if (!video || video.videoWidth < 2) {
       setError("Camera is nog niet klaar. Wacht een seconde.");
       return;
     }
+    const mark = stamp ?? code;
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
+    if (kind !== "before" && mark) {
+      const bar = Math.max(56, Math.round(canvas.height * 0.12));
+      ctx.fillStyle = "rgba(0,0,0,0.62)";
+      ctx.fillRect(0, canvas.height - bar, canvas.width, bar);
+      ctx.fillStyle = "#39ff14";
+      ctx.font = `bold ${Math.max(28, Math.round(canvas.width * 0.07))}px sans-serif`;
+      ctx.textBaseline = "middle";
+      ctx.fillText(`LOCKIN ${mark}`, 24, canvas.height - bar / 2);
+    }
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/jpeg", 0.85)
     );
@@ -129,12 +139,16 @@ export function ProofPage() {
     setRecording(false);
   }
 
-  async function ensureAfterChallenge() {
+  async function takeAfter() {
     if (!item) return;
-    if (code && expiresAt && new Date(expiresAt).getTime() > Date.now()) return;
-    const ch = await issueChallenge(item.id);
-    setCode(ch.code);
-    setExpiresAt(ch.expiresAt);
+    let mark = code;
+    if (!mark || !expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
+      const ch = await issueChallenge(item.id);
+      setCode(ch.code);
+      setExpiresAt(ch.expiresAt);
+      mark = ch.code;
+    }
+    await snap(item.proof_type === "photo_pair" ? "after" : "proof", mark);
   }
 
   async function submit() {
@@ -211,7 +225,7 @@ export function ProofPage() {
       {needChallenge && code && (
         <div className="mt-5 rounded-2xl border border-accent bg-panel px-4 py-4">
           <p className="text-xs uppercase tracking-wide text-mute">
-            Challenge — houd dit in beeld
+            Komt op de foto
           </p>
           <p className="mt-1 text-3xl font-semibold tracking-widest">
             LOCKIN {code}
@@ -261,7 +275,7 @@ export function ProofPage() {
               onClick={startVideo}
               className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
             >
-              Start opname
+              {shot ? "Opnieuw opnemen" : "Start opname"}
             </button>
           )
         ) : item.proof_type === "photo_pair" && !before ? (
@@ -275,13 +289,10 @@ export function ProofPage() {
         ) : (
           <button
             type="button"
-            onClick={async () => {
-              if (item.proof_type === "photo_pair") await ensureAfterChallenge();
-              await snap(item.proof_type === "photo_pair" ? "after" : "proof");
-            }}
+            onClick={takeAfter}
             className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
           >
-            {item.proof_type === "photo_pair" ? "Foto na" : "Foto maken"}
+            {shot ? "Opnieuw foto" : item.proof_type === "photo_pair" ? "Foto na" : "Foto maken"}
           </button>
         )}
       </div>
