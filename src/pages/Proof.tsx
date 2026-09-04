@@ -7,11 +7,7 @@ import {
   requestReview,
   uploadProofFile,
 } from "../lib/lockin";
-import {
-  PROOF_LABELS,
-  commitmentTitle,
-  type Commitment,
-} from "../lib/types";
+import { commitmentTitle, type Commitment } from "../lib/types";
 
 function humanError(err: unknown): string {
   if (err instanceof Error && err.message && !err.message.startsWith("{")) {
@@ -144,16 +140,15 @@ export function ProofPage() {
     setRecording(false);
   }
 
-  async function takeAfter() {
-    if (!item) return;
+  async function takeAfter(row: Commitment) {
     let mark = code;
     if (!mark || !expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
-      const ch = await issueChallenge(item.id);
+      const ch = await issueChallenge(row.id);
       setCode(ch.code);
       setExpiresAt(ch.expiresAt);
       mark = ch.code;
     }
-    await snap(item.proof_type === "photo_pair" ? "after" : "proof", mark);
+    await snap(row.proof_type === "photo_pair" ? "after" : "proof", mark);
   }
 
   async function submit() {
@@ -232,20 +227,21 @@ export function ProofPage() {
     );
   }
 
-  const needChallenge = item.proof_type !== "photo_pair" || Boolean(before);
+  const row = item;
+  const needChallenge = row.proof_type !== "photo_pair" || Boolean(before);
   const primaryLabel = !camOn
     ? "Camera starten"
-    : item.proof_type === "video"
+    : row.proof_type === "video"
       ? recording
         ? "Stop opname"
         : shot
           ? "Opnieuw opnemen"
           : "Start opname"
-      : item.proof_type === "photo_pair" && !before
+      : row.proof_type === "photo_pair" && !before
         ? "Foto voor"
         : shot
           ? "Opnieuw foto"
-          : item.proof_type === "photo_pair"
+          : row.proof_type === "photo_pair"
             ? "Foto na"
             : "Foto maken";
 
@@ -254,15 +250,15 @@ export function ProofPage() {
       void startCam();
       return;
     }
-    if (item.proof_type === "video") {
+    if (row.proof_type === "video") {
       recording ? stopVideo() : startVideo();
       return;
     }
-    if (item.proof_type === "photo_pair" && !before) {
+    if (row.proof_type === "photo_pair" && !before) {
       void snap("before");
       return;
     }
-    void takeAfter();
+    void takeAfter(row);
   }
 
   const ready = Boolean(shot);
@@ -299,11 +295,9 @@ export function ProofPage() {
         )}
       </div>
 
-      <p className="mt-3 truncate text-sm text-mute">
-        {commitmentTitle(item)}
-      </p>
+      <p className="mt-3 truncate text-sm text-mute">{commitmentTitle(row)}</p>
 
-      {item.proof_type === "video" && (
+      {row.proof_type === "video" && (
         <p className="mt-2 text-xs leading-5 text-mute">
           Video kan nu niet worden beoordeeld. Nieuwe beloftes gebruiken foto
           of foto voor + na.
