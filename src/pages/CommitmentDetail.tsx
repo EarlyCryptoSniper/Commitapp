@@ -50,14 +50,23 @@ function nudge(status: Commitment["status"]): string {
   return "";
 }
 
+function polishReason(text: string): string {
+  if (/zit nog niet in deze versie/i.test(text) || /video-keuring zit nog niet/i.test(text)) {
+    return "Video kan niet worden beoordeeld. Gebruik een foto of foto voor + na.";
+  }
+  return text;
+}
+
 function verdictText(row: VerdictRow | null): string | null {
   if (!row) return null;
   const check = row.checklist ?? {};
-  if (typeof check.reason === "string" && check.reason.trim()) return check.reason;
+  if (typeof check.reason === "string" && check.reason.trim()) {
+    return polishReason(check.reason);
+  }
   if (row.raw_response) {
     try {
       const parsed = JSON.parse(row.raw_response) as { reason?: string };
-      if (parsed.reason) return parsed.reason;
+      if (parsed.reason) return polishReason(parsed.reason);
     } catch {
       /* raw is not json */
     }
