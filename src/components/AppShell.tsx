@@ -1,24 +1,32 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Footer } from "./Footer";
 import { useAuth } from "../lib/AuthContext";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `text-sm ${isActive ? "text-accent" : "text-mute hover:text-white"}`;
+  `rounded-full px-2 py-1 text-sm ${
+    isActive ? "text-accent" : "text-mute hover:text-white"
+  }`;
 
 export function AppShell() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const onHome = pathname === "/";
 
   return (
     <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-lg flex-col">
-      <header className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-4">
+      <header className="flex w-full min-w-0 items-center justify-between gap-3 px-4 py-3.5">
         <Link
-          to={user ? "/dashboard" : "/"}
-          className="shrink-0 text-lg font-semibold tracking-tight"
+          to="/"
+          aria-label="Home"
+          aria-current={onHome ? "page" : undefined}
+          className={`shrink-0 py-1 text-lg font-semibold tracking-tight ${
+            onHome ? "text-accent" : "text-white"
+          }`}
         >
           LockIn
         </Link>
         {user ? (
-          <nav className="flex min-w-0 shrink-0 gap-3 sm:gap-4">
+          <nav className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
             <NavLink to="/dashboard" className={linkClass}>
               Overzicht
             </NavLink>
@@ -30,12 +38,15 @@ export function AppShell() {
             </NavLink>
           </nav>
         ) : (
-          <Link to="/auth" className="shrink-0 text-sm text-accent">
+          <Link
+            to="/auth"
+            className="shrink-0 rounded-full px-3 py-1.5 text-sm text-accent"
+          >
             Inloggen
           </Link>
         )}
       </header>
-      <main className="w-full min-w-0 max-w-full flex-1 px-4 pb-8">
+      <main className="w-full min-w-0 max-w-full flex-1 px-4 pb-10">
         <Outlet />
       </main>
       <Footer />

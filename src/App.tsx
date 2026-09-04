@@ -9,6 +9,7 @@ import { NewCommitmentPage } from "./pages/NewCommitment";
 import { CommitmentDetailPage } from "./pages/CommitmentDetail";
 import { ProofPage } from "./pages/Proof";
 import { AccountPage } from "./pages/Account";
+import { FaqPage } from "./pages/Faq";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/faq" element={<FaqPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/commitment/new" element={<NewCommitmentPage />} />

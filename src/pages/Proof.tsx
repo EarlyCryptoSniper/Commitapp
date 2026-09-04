@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   fetchCommitment,
   finalizeProof,
@@ -9,9 +9,16 @@ import {
 } from "../lib/lockin";
 import {
   PROOF_LABELS,
-  TASK_LABELS,
+  commitmentTitle,
   type Commitment,
 } from "../lib/types";
+
+function humanError(err: unknown): string {
+  if (err instanceof Error && err.message && !err.message.startsWith("{")) {
+    return err.message;
+  }
+  return "Er ging iets mis.";
+}
 
 export function ProofPage() {
   const { id } = useParams();
@@ -43,9 +50,7 @@ export function ProofPage() {
           setExpiresAt(ch.expiresAt);
         }
       })
-      .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Niet gevonden")
-      );
+      .catch((err: unknown) => setError(humanError(err)));
     return () => stopCam();
   }, [id]);
 
@@ -157,7 +162,7 @@ export function ProofPage() {
     setError(null);
     try {
       if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-        throw new Error("Challenge verlopen. Vernieuw de pagina.");
+        throw new Error("Opdrachtcode verlopen. Vernieuw de pagina.");
       }
       let path: string;
       if (item.proof_type === "photo_pair") {
@@ -192,124 +197,166 @@ export function ProofPage() {
       }
       navigate(`/commitment/${item.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload mislukt.");
+      setError(humanError(err));
     } finally {
       setBusy(false);
     }
   }
 
   if (!item) {
-    return <p className="text-sm text-mute">{error ?? "Laden…"}</p>;
+    return (
+      <p
+        className="text-sm text-mute"
+        {...(error ? { role: "alert", "aria-live": "polite" } : {})}
+      >
+        {error ?? "Laden…"}
+      </p>
+    );
   }
 
   if (item.status !== "locked") {
     return (
       <section className="pt-6">
-        <h1 className="text-2xl font-semibold">Bewijs</h1>
-        <p className="mt-3 text-sm text-mute">
-          Deze commitment wacht niet op bewijs.
+        <h1 className="text-2xl font-semibold tracking-tight">Bewijs</h1>
+        <p className="mt-3 text-sm leading-6 text-mute">
+          Deze belofte wacht nu niet op een nieuwe foto. Open de belofte voor
+          de status.
         </p>
+        <Link
+          to={`/commitment/${item.id}`}
+          className="mt-6 inline-flex rounded-full bg-accent px-5 py-3.5 text-sm font-semibold text-ink"
+        >
+          Naar belofte
+        </Link>
       </section>
     );
   }
 
   const needChallenge = item.proof_type !== "photo_pair" || Boolean(before);
+  const primaryLabel = !camOn
+    ? "Camera starten"
+    : item.proof_type === "video"
+      ? recording
+        ? "Stop opname"
+        : shot
+          ? "Opnieuw opnemen"
+          : "Start opname"
+      : item.proof_type === "photo_pair" && !before
+        ? "Foto voor"
+        : shot
+          ? "Opnieuw foto"
+          : item.proof_type === "photo_pair"
+            ? "Foto na"
+            : "Foto maken";
+
+  function onPrimary() {
+    if (!camOn) {
+      void startCam();
+      return;
+    }
+    if (item.proof_type === "video") {
+      recording ? stopVideo() : startVideo();
+      return;
+    }
+    if (item.proof_type === "photo_pair" && !before) {
+      void snap("before");
+      return;
+    }
+    void takeAfter();
+  }
+
+  const ready = Boolean(shot);
+  const hint = before && !shot
+    ? "Voor-foto klaar. Nu de na-foto."
+    : shot
+      ? "Mooi. Insturen als het beeld scherp is."
+      : "Houd de opdrachtcode in beeld. Jij kunt dit.";
 
   return (
-    <section className="w-full min-w-0 pt-4">
-      <h1 className="text-2xl font-semibold">Bewijs</h1>
-      <p className="mt-2 text-sm text-mute">
-        {TASK_LABELS[item.task]} · {PROOF_LABELS[item.proof_type]}
-      </p>
-
-      {needChallenge && code && (
-        <div className="mt-5 rounded-2xl border border-accent bg-panel px-4 py-4">
-          <p className="text-xs uppercase tracking-wide text-mute">
-            Komt op de foto
+    <section className="w-full min-w-0">
+      <div className="relative -mx-4 overflow-hidden bg-black">
+        <video
+          ref={videoRef}
+          aria-label="Cameravoorbeeld"
+          className="block h-[64vh] min-h-[300px] w-full max-w-full object-cover"
+          playsInline
+          muted
+        />
+        {needChallenge && code && (
+          <div className="absolute inset-x-3 bottom-3 rounded-2xl bg-black/85 px-4 py-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent">
+              Komt op de foto
+            </p>
+            <p className="mt-1 break-words text-[1.85rem] font-semibold leading-none tracking-[0.14em] text-accent sm:text-4xl">
+              LOCKIN {code}
+            </p>
+          </div>
+        )}
+        {!camOn && (
+          <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-mute">
+            Tik Camera starten.
           </p>
-          <p className="mt-1 text-3xl font-semibold tracking-widest">
-            LOCKIN {code}
-          </p>
-        </div>
-      )}
-
-      <video
-        ref={videoRef}
-        className="mt-5 w-full max-w-full rounded-2xl border border-line bg-black"
-        playsInline
-        muted
-      />
-
-      {preview && (
-        <div className="mt-4">
-          <p className="text-sm font-medium">Genomen bewijs</p>
-          {shot?.type.startsWith("video/") ? (
-            <video src={preview} controls className="mt-2 w-full rounded-2xl" />
-          ) : (
-            <img src={preview} alt="Bewijs" className="mt-2 w-full rounded-2xl" />
-          )}
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {!camOn ? (
-          <button
-            type="button"
-            onClick={startCam}
-            className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
-          >
-            Camera starten
-          </button>
-        ) : item.proof_type === "video" ? (
-          recording ? (
-            <button
-              type="button"
-              onClick={stopVideo}
-              className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
-            >
-              Stop opname
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={startVideo}
-              className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
-            >
-              {shot ? "Opnieuw opnemen" : "Start opname"}
-            </button>
-          )
-        ) : item.proof_type === "photo_pair" && !before ? (
-          <button
-            type="button"
-            onClick={() => snap("before")}
-            className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
-          >
-            Foto voor
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={takeAfter}
-            className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-ink"
-          >
-            {shot ? "Opnieuw foto" : item.proof_type === "photo_pair" ? "Foto na" : "Foto maken"}
-          </button>
         )}
       </div>
 
-      <p className="mt-3 text-xs text-mute">
-        {before ? "Voor-foto klaar. " : ""}
-        {shot ? "Bewijs klaar om in te sturen." : "Nog geen foto."}
+      <p className="mt-3 truncate text-sm text-mute">
+        {commitmentTitle(item)}
       </p>
-      {error && <p className="mt-4 text-sm text-danger">{error}</p>}
+
+      {item.proof_type === "video" && (
+        <p className="mt-2 text-xs leading-5 text-mute">
+          Video kan nu niet worden beoordeeld. Nieuwe beloftes gebruiken foto
+          of foto voor + na.
+        </p>
+      )}
+
+      {preview &&
+        (shot?.type.startsWith("video/") ? (
+          <video
+            src={preview}
+            muted
+            className="mt-3 h-14 w-14 rounded-xl object-cover"
+            aria-label="Opgenomen bewijs"
+          />
+        ) : (
+          <img
+            src={preview}
+            alt="Genomen bewijs"
+            className="mt-3 h-14 w-14 rounded-xl object-cover"
+          />
+        ))}
+
+      {error && (
+        <p className="mt-3 text-sm text-danger" role="alert" aria-live="polite">
+          {error}
+        </p>
+      )}
+
+      <p className="mt-3 text-center text-xs leading-5 text-mute">{hint}</p>
+
+      <button
+        type="button"
+        onClick={onPrimary}
+        className={`mt-4 w-full rounded-full py-3.5 text-sm font-semibold ${
+          ready
+            ? "border border-line text-white"
+            : "bg-accent text-ink hover:brightness-110"
+        }`}
+      >
+        {primaryLabel}
+      </button>
 
       <button
         type="button"
         disabled={busy || !shot}
         onClick={submit}
-        className="mt-8 w-full rounded-full bg-accent py-3 text-sm font-semibold text-ink disabled:opacity-40"
+        className={`mt-3 w-full rounded-full py-3.5 text-sm font-semibold disabled:opacity-40 ${
+          ready
+            ? "bg-accent text-ink hover:brightness-110"
+            : "border border-line text-mute"
+        }`}
       >
-        {busy ? "Bezig…" : "Bewijs insturen"}
+        {busy ? "Bezig met keuren…" : "Bewijs insturen"}
       </button>
     </section>
   );

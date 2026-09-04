@@ -5,6 +5,15 @@ import { useAuth } from "../lib/AuthContext";
 
 type Mode = "login" | "signup" | "magic";
 
+const TABS: { id: Mode; label: string }[] = [
+  { id: "login", label: "Inloggen" },
+  { id: "magic", label: "Link per e-mail" },
+  { id: "signup", label: "Account maken" },
+];
+
+const inputClass =
+  "mt-1.5 w-full min-w-0 rounded-2xl border border-line bg-panel px-4 py-3.5 text-sm outline-none transition focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
 export function AuthPage() {
   const { user, loading } = useAuth();
   const [mode, setMode] = useState<Mode>("login");
@@ -20,6 +29,12 @@ export function AuthPage() {
 
   if (!loading && user) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    setMessage(null);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -46,7 +61,7 @@ export function AuthPage() {
           options: { shouldCreateUser: false },
         });
         if (err) throw err;
-        setMessage("Check je inbox voor de magic link.");
+        setMessage("Check je inbox voor de link.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Er ging iets mis.");
@@ -56,68 +71,101 @@ export function AuthPage() {
   }
 
   return (
-    <section className="pt-6">
-      <h1 className="text-2xl font-semibold">
+    <section className="w-full min-w-0 pt-4">
+      <h1 className="text-2xl font-semibold tracking-tight">
         {mode === "signup" ? "Account maken" : "Inloggen"}
       </h1>
-      <p className="mt-2 text-sm text-mute">
-        Magic link maakt geen nieuw account. Gebruik daarvoor Account maken.
+      <p className="mt-2 text-sm leading-6 text-mute">
+        {mode === "magic"
+          ? "We sturen een loginlink. Nieuw? Kies Account maken."
+          : mode === "signup"
+            ? "Kies een wachtwoord van minimaal 8 tekens."
+            : "Wachtwoord of een link per e-mail."}
       </p>
 
-      <div className="mt-5 flex gap-2 text-sm">
-        <button
-          className={mode === "login" ? "text-accent" : "text-mute"}
-          onClick={() => setMode("login")}
-          type="button"
-        >
-          Wachtwoord
-        </button>
-        <button
-          className={mode === "magic" ? "text-accent" : "text-mute"}
-          onClick={() => setMode("magic")}
-          type="button"
-        >
-          Magic link
-        </button>
-        <button
-          className={mode === "signup" ? "text-accent" : "text-mute"}
-          onClick={() => setMode("signup")}
-          type="button"
-        >
-          Account maken
-        </button>
+      <div
+        className="mt-6 grid w-full min-w-0 grid-cols-3 gap-1 rounded-full border border-line bg-panel p-1"
+        role="tablist"
+        aria-label="Inlogmethode"
+      >
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={mode === tab.id}
+            onClick={() => switchMode(tab.id)}
+            className={`min-w-0 rounded-full px-1 py-2.5 text-center text-[11px] font-medium leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:text-xs ${
+              mode === tab.id ? "bg-accent text-ink" : "text-mute"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-3">
-        <input
-          type="email"
-          required
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-xl border border-line bg-panel px-4 py-3 text-sm outline-none focus:border-accent"
-        />
-        {mode !== "magic" && (
+      <form onSubmit={onSubmit} className="mt-7 space-y-4">
+        <div>
+          <label htmlFor="auth-email" className="block text-xs font-medium text-mute">
+            E-mail
+          </label>
           <input
-            type="password"
+            id="auth-email"
+            name="email"
+            type="email"
+            autoComplete="email"
             required
-            minLength={8}
-            placeholder="Wachtwoord"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-line bg-panel px-4 py-3 text-sm outline-none focus:border-accent"
+            placeholder="jij@email.nl"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError(null);
+            }}
+            className={inputClass}
           />
+        </div>
+        {mode !== "magic" && (
+          <div>
+            <label htmlFor="auth-password" className="block text-xs font-medium text-mute">
+              Wachtwoord
+            </label>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              required
+              minLength={8}
+              title="Minimaal 8 tekens."
+              placeholder="Wachtwoord"
+              value={password}
+              onInvalid={(e) => {
+                e.currentTarget.setCustomValidity("Minimaal 8 tekens.");
+              }}
+              onChange={(e) => {
+                e.currentTarget.setCustomValidity("");
+                setPassword(e.target.value);
+                setError(null);
+              }}
+              className={inputClass}
+            />
+            <p className="mt-1.5 text-xs text-mute">Minimaal 8 tekens.</p>
+          </div>
         )}
         <button
           disabled={busy}
-          className="w-full rounded-full bg-accent py-3 text-sm font-semibold text-ink disabled:opacity-50"
+          className="w-full rounded-full bg-accent py-3.5 text-sm font-semibold text-ink transition hover:brightness-110 disabled:opacity-50"
         >
           {busy ? "Bezig…" : mode === "signup" ? "Account maken" : "Doorgaan"}
         </button>
       </form>
 
       {message && <p className="mt-4 text-sm text-accent">{message}</p>}
-      {error && <p className="mt-4 text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="mt-4 text-sm text-danger" role="alert" aria-live="polite">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

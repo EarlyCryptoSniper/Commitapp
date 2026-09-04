@@ -1,18 +1,30 @@
 import { requireSupabase } from "./supabase";
-import type { Commitment, Profile, TaskId } from "./types";
+import type { Commitment, Profile, ProofType } from "./types";
+
+export type VerdictRow = {
+  id: string;
+  commitment_id: string;
+  result: "passed" | "failed" | "insufficient";
+  checklist: Record<string, unknown> | null;
+  raw_response: string | null;
+  created_at: string;
+};
 
 export async function fetchProfile(): Promise<Profile | null> {
   const db = requireSupabase();
   const { data: sessionData } = await db.auth.getUser();
   const user = sessionData.user;
   if (!user) return null;
+
   const { data, error } = await db
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
+
   if (error) throw error;
   if (data) return data as Profile;
+
   return {
     id: user.id,
     email: user.email ?? "",
@@ -30,10 +42,12 @@ export async function expireDueCommitments(): Promise<number> {
 export async function fetchCommitments(): Promise<Commitment[]> {
   const db = requireSupabase();
   await expireDueCommitments().catch(() => undefined);
+
   const { data, error } = await db
     .from("commitments")
     .select("*")
     .order("created_at", { ascending: false });
+
   if (error) throw error;
   return (data ?? []) as Commitment[];
 }
@@ -41,26 +55,32 @@ export async function fetchCommitments(): Promise<Commitment[]> {
 export async function fetchCommitment(id: string): Promise<Commitment | null> {
   const db = requireSupabase();
   await expireDueCommitments().catch(() => undefined);
+
   const { data, error } = await db
     .from("commitments")
     .select("*")
     .eq("id", id)
     .maybeSingle();
+
   if (error) throw error;
   return (data as Commitment | null) ?? null;
 }
 
 export async function createCommitmentDraft(input: {
   amountCents: 500 | 1000;
-  task: TaskId;
   deadlineIso: string;
+  promiseText: string;
+  evidenceRule: string;
+  proofType: ProofType;
   timezone?: string;
 }): Promise<Commitment> {
   const db = requireSupabase();
   const { data, error } = await db.rpc("create_commitment_draft", {
     p_amount_cents: input.amountCents,
-    p_task: input.task,
     p_deadline: input.deadlineIso,
+    p_promise_text: input.promiseText,
+    p_evidence_rule: input.evidenceRule,
+    p_proof_type: input.proofType,
     p_timezone: input.timezone ?? "Europe/Amsterdam",
   });
   if (error) throw error;
@@ -74,12 +94,6 @@ export async function lockCommitment(id: string): Promise<Commitment> {
   });
   if (error) throw error;
   return data as Commitment;
-}
-
-export async function deleteDraft(id: string): Promise<void> {
-  const db = requireSupabase();
-  const { error } = await db.rpc("delete_draft", { p_commitment_id: id });
-  if (error) throw error;
 }
 
 export async function issueChallenge(
@@ -103,11 +117,14 @@ export async function uploadProofFile(input: {
   const { data: sessionData } = await db.auth.getUser();
   const uid = sessionData.user?.id;
   if (!uid) throw new Error("Niet ingelogd");
+
   const ext = extFromFile(input.file);
   const path = `${uid}/${input.commitmentId}/${input.slot}.${ext}`;
+
   const { error } = await db.storage
     .from("commitment-proofs")
     .upload(path, input.file, { upsert: true, contentType: input.file.type });
+
   if (error) throw error;
   return path;
 }
@@ -121,10 +138,13 @@ export async function fetchProofSignedUrl(
     .select("storage_path")
     .eq("commitment_id", commitmentId)
     .maybeSingle();
+
   if (error || !data?.storage_path) return null;
+
   const { data: signed, error: signError } = await db.storage
     .from("commitment-proofs")
     .createSignedUrl(data.storage_path, 60 * 30);
+
   if (signError || !signed?.signedUrl) return null;
   return signed.signedUrl;
 }
@@ -142,20 +162,13 @@ export async function finalizeProof(
   return data as Commitment;
 }
 
-export type VerdictRow = {
-  result: "passed" | "failed" | "insufficient";
-  checklist: Record<string, unknown>;
-  raw_response: string | null;
-  created_at: string;
-};
-
 export async function fetchLatestVerdict(
   commitmentId: string
 ): Promise<VerdictRow | null> {
   const db = requireSupabase();
   const { data, error } = await db
     .from("verdicts")
-    .select("result, checklist, raw_response, created_at")
+    .select("*")
     .eq("commitment_id", commitmentId)
     .order("created_at", { ascending: false })
     .limit(1)

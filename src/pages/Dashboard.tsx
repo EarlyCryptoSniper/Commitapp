@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchCommitments } from "../lib/lockin";
-import { STATUS_LABELS, TASK_LABELS, type Commitment } from "../lib/types";
+import {
+  STATUS_LABELS,
+  commitmentTitle,
+  type Commitment,
+  type CommitmentStatus,
+} from "../lib/types";
 
 type Filter = "all" | "open" | "reviewing" | "done";
 
@@ -16,6 +21,26 @@ function matches(item: Commitment, filter: Filter): boolean {
   );
 }
 
+function remaining(deadline: string): string {
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Deadline voorbij";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return `${h}u ${m}m resterend`;
+}
+
+function euro(cents: number): string {
+  return `EUR ${(cents / 100).toFixed(0)}`;
+}
+
+function pillClass(status: CommitmentStatus): string {
+  if (status === "completed") return "bg-accent text-ink";
+  if (status === "reviewing") return "border border-accent text-accent";
+  if (status === "failed") return "border border-danger text-danger";
+  if (status === "insufficient_evidence") return "border border-line text-white";
+  return "border border-line text-mute";
+}
+
 export function DashboardPage() {
   const [items, setItems] = useState<Commitment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +51,7 @@ export function DashboardPage() {
     fetchCommitments()
       .then(setItems)
       .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Kon commitments niet laden")
+        setError(err instanceof Error ? err.message : "Kon beloftes niet laden")
       )
       .finally(() => setLoading(false));
   }, []);
@@ -34,31 +59,40 @@ export function DashboardPage() {
   const visible = items.filter((item) => matches(item, filter));
 
   return (
-    <section className="pt-2">
-      <div className="mb-4 flex items-end justify-between">
-        <h1 className="text-2xl font-semibold">Overzicht</h1>
-        <Link to="/commitment/new" className="text-sm text-accent">
+    <section className="w-full min-w-0 pt-2">
+      <div className="mb-5 flex min-w-0 items-end justify-between gap-3">
+        <h1 className="min-w-0 text-2xl font-semibold tracking-tight">
+          Mijn beloftes
+        </h1>
+        <Link
+          to="/commitment/new"
+          className="shrink-0 rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-ink"
+        >
           Nieuw
         </Link>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div
+        className="mb-6 grid w-full min-w-0 grid-cols-4 gap-1 rounded-full border border-line bg-panel p-1"
+        role="tablist"
+        aria-label="Filter"
+      >
         {(
           [
             ["all", "Alles"],
             ["open", "Open"],
-            ["reviewing", "In beoordeling"],
-            ["done", "Afgerond"],
+            ["reviewing", "Beoordeling"],
+            ["done", "Klaar"],
           ] as const
         ).map(([id, label]) => (
           <button
             key={id}
             type="button"
+            role="tab"
+            aria-selected={filter === id}
             onClick={() => setFilter(id)}
-            className={`rounded-full px-3 py-1 text-xs ${
-              filter === id
-                ? "bg-accent text-ink"
-                : "border border-line text-mute"
+            className={`min-w-0 rounded-full px-1 py-2 text-center text-[11px] font-medium leading-tight sm:text-xs ${
+              filter === id ? "bg-accent text-ink" : "text-mute"
             }`}
           >
             {label}
@@ -67,27 +101,48 @@ export function DashboardPage() {
       </div>
 
       {loading && <p className="text-sm text-mute">Laden…</p>}
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="text-sm text-danger" role="alert" aria-live="polite">
+          {error}
+        </p>
+      )}
 
       {!loading && visible.length === 0 && (
-        <p className="text-sm text-mute">Niets in deze filter.</p>
+        <div className="rounded-2xl border border-line bg-panel px-4 py-6">
+          <p className="text-sm leading-6 text-mute">
+            Nog geen beloftes hier. Zet er een vast — jij kunt dit.
+          </p>
+          <Link
+            to="/commitment/new"
+            className="mt-4 inline-flex rounded-full bg-accent px-4 py-2 text-sm font-semibold text-ink"
+          >
+            Nieuwe belofte
+          </Link>
+        </div>
       )}
 
       <ul className="space-y-3">
         {visible.map((item) => (
-          <li key={item.id}>
+          <li key={item.id} className="min-w-0">
             <Link
               to={`/commitment/${item.id}`}
-              className="block rounded-2xl border border-line bg-panel p-4"
+              className="block min-w-0 rounded-2xl border border-line bg-panel p-4 transition hover:border-accent/50"
             >
-              <div className="flex items-center justify-between">
-                <p className="font-medium">{TASK_LABELS[item.task]}</p>
-                <span className="text-xs text-mute">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <p className="min-w-0 break-words text-[15px] font-semibold leading-5 tracking-tight">
+                  {commitmentTitle(item)}
+                </p>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${pillClass(
+                    item.status
+                  )}`}
+                >
                   {STATUS_LABELS[item.status]}
                 </span>
               </div>
-              <p className="mt-1 text-sm text-mute">
-                €{(item.amount_cents / 100).toFixed(0)} · deadline{" "}
+              <p className="mt-3 text-sm">{remaining(item.deadline)}</p>
+              <p className="mt-1 text-xs text-mute">
+                {euro(item.amount_cents)} ·{" "}
                 {new Date(item.deadline).toLocaleString("nl-NL")}
               </p>
             </Link>

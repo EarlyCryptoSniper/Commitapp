@@ -6,7 +6,8 @@ export type TaskId =
   | "tiktok_max_1h"
   | "pushups_10"
   | "desk_admin"
-  | "show_code";
+  | "show_code"
+  | "custom";
 
 export type ProofType = "photo" | "photo_pair" | "video";
 
@@ -28,7 +29,9 @@ export type Commitment = {
   id: string;
   user_id: string;
   amount_cents: 500 | 1000;
-  task: TaskId;
+  task: TaskId | string;
+  promise_text: string | null;
+  evidence_rule: string | null;
   deadline: string;
   timezone: string;
   proof_type: ProofType;
@@ -43,75 +46,6 @@ export type Proof = {
   commitment_id: string;
   storage_path: string;
   submitted_at: string;
-};
-
-export type EvidenceContract = {
-  pass: string;
-  fail: string;
-  insufficient: string;
-  challenge: string;
-};
-
-export type TaskDef = {
-  id: TaskId;
-  label: string;
-  proofType: ProofType;
-  proofLabel: string;
-  hint: string;
-  contract: EvidenceContract;
-};
-
-export const TASKS: TaskDef[] = [
-  {
-    id: "desk_admin",
-    label: "Bureau afronden",
-    proofType: "photo_pair",
-    proofLabel: "Foto voor + na",
-    hint: "Eerst de startsituatie, daarna het resultaat met challenge in beeld.",
-    contract: {
-      pass: "Zelfde plek. Voor rommelig of open. Na leger. Challenge leesbaar en geldig.",
-      fail: "Na gelijk of erger, andere ruimte, of verlopen/ontbrekende challenge.",
-      insufficient: "Te donker, andere hoek, challenge onleesbaar, of voor-foto ontbreekt.",
-      challenge: "Na-foto via LockIn-camera. Code 10 min geldig.",
-    },
-  },
-  {
-    id: "pushups_10",
-    label: "10 keer opdrukken",
-    proofType: "video",
-    proofLabel: "Video",
-    hint: "Eén ononderbroken video. Challenge in de eerste seconden.",
-    contract: {
-      pass: "Eén take. Challenge vooraan geldig. Ongeveer 10 herhalingen zichtbaar.",
-      fail: "Geen oefening, duidelijk geknipt, of andere oefening.",
-      insufficient: "Telling onzeker, lichaam half buiten beeld, of challenge onleesbaar.",
-      challenge: "Video via LockIn-camera. Code 10 min geldig, vooraan in beeld.",
-    },
-  },
-  {
-    id: "meditate",
-    label: "10 min mediteren",
-    proofType: "photo",
-    proofLabel: "Foto",
-    hint: "Timer of app ≥10:00 plus challenge in hetzelfde kader.",
-    contract: {
-      pass: "Leesbare timer van minstens 10 minuten en geldige challenge.",
-      fail: "Timer onder 10 minuten of geen tijd zichtbaar.",
-      insufficient: "Cijfers onleesbaar of challenge weg.",
-      challenge: "Foto via LockIn-camera. Code 10 min geldig, in hetzelfde kader.",
-    },
-  },
-];
-
-export const TASK_LABELS: Record<TaskId, string> = {
-  meditate: "10 min mediteren",
-  workout: "Sporten",
-  no_takeaway: "Geen takeaway",
-  stretch: "Stretchen",
-  tiktok_max_1h: "Max 1 uur TikTok",
-  pushups_10: "10 keer opdrukken",
-  desk_admin: "Bureau afronden",
-  show_code: "Toon de code",
 };
 
 export const PROOF_LABELS: Record<ProofType, string> = {
@@ -129,9 +63,25 @@ export const STATUS_LABELS: Record<CommitmentStatus, string> = {
   failed: "Mislukt",
 };
 
-export const ALLOWED_AMOUNTS = [500, 1000] as const;
-export const ALLOWED_TASKS = TASKS.map((t) => t.id);
+export const TASK_LABELS: Record<string, string> = {
+  meditate: "10 min mediteren",
+  workout: "Sporten",
+  no_takeaway: "Geen takeaway",
+  stretch: "Stretchen",
+  tiktok_max_1h: "Max 1 uur TikTok",
+  pushups_10: "10 keer opdrukken",
+  desk_admin: "Bureau afronden",
+  show_code: "Toon de code",
+  custom: "Eigen belofte",
+};
 
-export function taskDef(id: TaskId): TaskDef | undefined {
-  return TASKS.find((t) => t.id === id);
+export const ALLOWED_AMOUNTS = [500, 1000] as const;
+
+export function commitmentTitle(item: {
+  promise_text?: string | null;
+  task: string;
+}): string {
+  const text = item.promise_text?.trim();
+  if (text) return text;
+  return TASK_LABELS[item.task] ?? item.task;
 }

@@ -1,17 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const TASK_CONTRACTS: Record<string, string> = {
-  desk_admin:
-    "Twee foto's: BEFORE en AFTER. PASS alleen als ALLES waar is: (1) dezelfde plek, (2) AFTER is duidelijk leger/opgeruimder dan BEFORE, (3) LOCKIN XXXX staat leesbaar op AFTER. Als AFTER hetzelfde of voller is: FAILED. Als je maar één foto hebt, of niet kunt zien of het leger is: INSUFFICIENT. Code alleen is NOOIT genoeg voor PASS.",
-  meditate:
-    "Foto van timer/app minstens 10:00 EN challenge LOCKIN XXXX in hetzelfde kader. PASS alleen als beide leesbaar. FAIL als timer onder 10 minuten. INSUFFICIENT als onleesbaar.",
-  show_code:
-    "PASS alleen als LOCKIN XXXX scherp leesbaar is. FAIL bij andere code. INSUFFICIENT als onleesbaar.",
-  pushups_10:
-    "Video valt buiten deze versie. overall moet insufficient zijn.",
+type VerdictResult = "passed" | "failed" | "insufficient";
+
+const DISALLOWED =
+  /geweld|moord|verkracht|zelfmoord|zelfbeschadiging|minderjarig|child.?sex|exploitatie|terror|bom|drug deal|haatzaai/i;
+
+const NEGATIVE =
+  /\b(geen|niet|nooit)\s+(meer\s+)?(takeaway|thuisbezorgd|alcohol|roken|sigaret|drugs|tiktok|snoep|fastfood|bestellen)\b|\bik\s+(doe|ga|zal|eet|drink|kijk|gebruik)\s+(geen|niet|nooit)\b|\bnooit\s+meer\b/i;
+
+const TASK_NL: Record<string, string> = {
+  workout: "Sporten",
+  desk: "Bureau afronden",
+  meditate: "10 min mediteren",
+  pushups: "10 keer opdrukken",
+  custom: "Eigen belofte",
 };
 
-type VerdictResult = "passed" | "failed" | "insufficient";
+/**
+ * VIDEO POLICY (Path B): gpt-4o-mini vision has no reliable video input
+ * in this edge stack (no ffmpeg frames). Video proofs → insufficient + NL.
+ * Later pass: hide video as proof_type in NewCommitment.tsx. Do not edit that here.
+ */
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -49,6 +58,20 @@ Deno.serve(async (req) => {
       return json({ ok: true, skipped: true, status: commitment.status });
     }
 
+    const promise =
+      String(commitment.promise_text ?? "").trim() ||
+      TASK_NL[String(commitment.task ?? "")] ||
+      String(commitment.task ?? "");
+    const rule = String(commitment.evidence_rule ?? "").trim();
+    const blob = `${promise} ${rule}`;
+
+    if (DISALLOWED.test(blob) || NEGATIVE.test(promise)) {
+      await apply(admin, commitmentId, "insufficient", {
+        reason: "Deze belofte of dit bewijs laten we niet toe.",
+      });
+      return json({ ok: true, result: "insufficient" });
+    }
+
     const { data: proof } = await admin
       .from("proofs")
       .select("storage_path")
@@ -59,7 +82,8 @@ Deno.serve(async (req) => {
     const ext = (proof.storage_path.split(".").pop() ?? "").toLowerCase();
     if (["webm", "mp4", "mov"].includes(ext)) {
       await apply(admin, commitmentId, "insufficient", {
-        reason: "Video-keuring zit nog niet in deze versie.",
+        reason:
+          "Video kan niet worden beoordeeld. Gebruik een foto of foto voor + na.",
       });
       return json({ ok: true, result: "insufficient" });
     }
@@ -92,14 +116,18 @@ Deno.serve(async (req) => {
       if (error || !data?.signedUrl) continue;
       imageUrls.push({ url: data.signedUrl });
     }
-    if (imageUrls.length === 0) throw new Error("could not sign proof");
+    if (imageUrls.length === 0) {
+      await apply(admin, commitmentId, "insufficient", {
+        reason: "Bewijs kon niet worden bekeken. Stuur een nieuwe foto.",
+      });
+      return json({ ok: true, result: "insufficient" });
+    }
 
     const challenge = commitment.challenge_code
       ? `LOCKIN ${commitment.challenge_code}`
       : "unknown";
-    const contract =
-      TASK_CONTRACTS[commitment.task] ??
-      "Bij twijfel: insufficient. Nooit raden.";
+
+    const contract = `Belofte (bevroren):\n${promise || "—"}\n\nBewijseis (bevroren):\n${rule || "—"}\n\nRegels:\n- Beoordeel ALLEEN deze belofte + bewijseis + LOCKIN-code.\n- PASS alleen als het bewijs de belofte aantoont volgens de bewijseis én de code leesbaar is als die hoort.\n- FAIL alleen als het bewijs aantoont dat de belofte niet is gehaald.\n- INSUFFICIENT bij twijfel, onleesbaar, ontbrekend, of een negatief dat je niet kunt bewijzen.\n- Code alleen is nooit PASS.\n- Geweld, illegaliteit, zelfbeschadiging, seksuele uitbuiting, haat, gevaarlijke challenges: overall=insufficient, reason="Deze belofte of dit bewijs laten we niet toe."`;
 
     const ai = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -115,14 +143,14 @@ Deno.serve(async (req) => {
           {
             role: "system",
             content:
-              "Je bent een strenge LockIn-scheidsrechter. PASS alleen als elk punt van het contract zichtbaar waar is. Twijfel = insufficient. Nooit cadeau-PASS. reason: één korte Nederlandse zin.",
+              'Je bent een strenge LockIn-scheidsrechter. Antwoord altijd als JSON-object met exact deze keys: overall, reason. overall is alleen "passed", "failed" of "insufficient". reason is één korte Nederlandse zin. Geen extra keys. Twijfel = insufficient. Nooit cadeau-PASS. JSON.',
           },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Contract:\n${contract}\nChallenge: ${challenge}\nEerste beeld is BEFORE, tweede is AFTER (als er twee zijn).\nBeoordeel de deadline niet.`,
+                text: `Contract:\n${contract}\nChallenge: ${challenge}\nEerste beeld is BEFORE, tweede is AFTER (als er twee zijn).\nBeoordeel de deadline niet. Antwoord als JSON.`,
               },
               ...imageUrls.map((img) => ({
                 type: "image_url",
@@ -135,21 +163,69 @@ Deno.serve(async (req) => {
     });
 
     const raw = await ai.text();
-    if (!ai.ok) throw new Error(`openai ${ai.status}: ${raw.slice(0, 300)}`);
+    if (!ai.ok) {
+      await apply(admin, commitmentId, "insufficient", {
+        reason: "Keuring gaf geen geldig antwoord. Stuur opnieuw bewijs.",
+      });
+      return json({ ok: true, result: "insufficient" });
+    }
 
-    const parsed = JSON.parse(raw) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = parsed.choices?.[0]?.message?.content ?? "{}";
-    const verdict = JSON.parse(content) as { overall?: string };
-    const overall = normalize(verdict.overall);
-    await apply(admin, commitmentId, overall, { raw: content });
-    return json({ ok: true, result: overall });
+    let content = "{}";
+    try {
+      const parsed = JSON.parse(raw) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      content = parsed.choices?.[0]?.message?.content ?? "{}";
+    } catch {
+      content = "{}";
+    }
+
+    const verdict = parseVerdict(content);
+    await apply(admin, commitmentId, verdict.overall, {
+      reason: verdict.reason,
+      raw: content,
+    });
+    return json({ ok: true, result: verdict.overall });
   } catch (err) {
     const message = err instanceof Error ? err.message : "review failed";
     return json({ ok: false, error: message }, 400);
   }
 });
+
+function parseVerdict(content: string): {
+  overall: VerdictResult;
+  reason: string;
+} {
+  try {
+    const obj = JSON.parse(content) as {
+      overall?: string;
+      reason?: string;
+    };
+    const overall = normalize(obj.overall);
+    const reason =
+      typeof obj.reason === "string" && obj.reason.trim()
+        ? obj.reason.trim().slice(0, 240)
+        : fallbackReason(overall);
+    if (DISALLOWED.test(reason)) {
+      return {
+        overall: "insufficient",
+        reason: "Deze belofte of dit bewijs laten we niet toe.",
+      };
+    }
+    return { overall, reason };
+  } catch {
+    return {
+      overall: "insufficient",
+      reason: "De keuring gaf geen geldig antwoord. Stuur opnieuw bewijs.",
+    };
+  }
+}
+
+function fallbackReason(overall: VerdictResult): string {
+  if (overall === "passed") return "De criteria zijn gehaald.";
+  if (overall === "failed") return "De criteria zijn aantoonbaar niet gehaald.";
+  return "De keuring kon het bewijs niet hard maken.";
+}
 
 function normalize(value: string | undefined): VerdictResult {
   const v = (value ?? "").toLowerCase();
