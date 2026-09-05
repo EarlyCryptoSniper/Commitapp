@@ -16,4 +16,6 @@ export const TRUST = {
     "Alleen tegen je belofte, bewijseis en LOCKIN-code. Twijfel = onvoldoende. Geen cadeau-uitspraak.",
   footerLine:
     "18+ - Geen kansspel. Nu wordt niets afgeschreven. Bij niet halen volgt later een vergoeding.",
+  privacyLine:
+    "Je bewijs (foto) is alleen voor keuring van jouw belofte. Niet openbaar, niet te koop. Exacte bewaartermijn publiceren we hier zodra die vastligt.",
 } as const;

@@ -12,13 +12,16 @@ type Filter = "all" | "open" | "reviewing" | "done";
 
 function matches(item: Commitment, filter: Filter): boolean {
   if (filter === "all") return true;
-  if (filter === "open") return item.status === "locked" || item.status === "draft";
+  if (filter === "open") {
+    return (
+      item.status === "locked" ||
+      item.status === "draft" ||
+      item.status === "insufficient_evidence" ||
+      item.status === "failed"
+    );
+  }
   if (filter === "reviewing") return item.status === "reviewing";
-  return (
-    item.status === "completed" ||
-    item.status === "failed" ||
-    item.status === "insufficient_evidence"
-  );
+  return item.status === "completed";
 }
 
 function remaining(deadline: string): string {
@@ -81,8 +84,8 @@ export function DashboardPage() {
           [
             ["all", "Alles"],
             ["open", "Open"],
-            ["reviewing", "Beoordeling"],
-            ["done", "Klaar"],
+            ["reviewing", "In keuring"],
+            ["done", "Gehaald"],
           ] as const
         ).map(([id, label]) => (
           <button

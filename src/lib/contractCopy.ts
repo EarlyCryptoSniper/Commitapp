@@ -13,4 +13,10 @@ export const CONTRACT = {
   insufficientBody:
     "Bewijs ontbreekt, is onleesbaar of niet hard genoeg. Twijfel = onvoldoende. Geen cadeau-uitspraak.",
   lockinNote: "LOCKIN-code moet leesbaar in de foto staan.",
+  proofGoodTitle: "Goed bewijs",
+  proofGoodBody:
+    "Zelfde scene als je belofte. LOCKIN-code groot en scherp leesbaar in beeld. Geen crop die de code afsnijdt.",
+  proofBadTitle: "Slecht bewijs",
+  proofBadBody:
+    "Code ontbreekt, wazig, of foto van iets anders dan je belofte. Twijfel = onvoldoende.",
 } as const;

@@ -342,6 +342,23 @@ export function NewCommitmentPage() {
               </div>
             ))}
           </dl>
+          <p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-mute">
+            Zo ziet keuring LOCKIN:
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-accent/40 bg-panel px-4 py-4">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
+                {CONTRACT.proofGoodTitle}
+              </p>
+              <p className="mt-2 text-sm leading-6">{CONTRACT.proofGoodBody}</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-panel px-4 py-4">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-mute">
+                {CONTRACT.proofBadTitle}
+              </p>
+              <p className="mt-2 text-sm leading-6">{CONTRACT.proofBadBody}</p>
+            </div>
+          </div>
           <div className="mt-8 flex gap-3">
             <button type="button" onClick={() => setStep("deadline")} className={secondaryBtn}>
               Terug

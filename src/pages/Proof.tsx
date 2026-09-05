@@ -377,6 +377,9 @@ export function ProofPage() {
       )}
 
       <p className="mt-3 text-center text-xs leading-5 text-mute">{hint}</p>
+      <p className="mt-2 text-center text-xs leading-5 text-mute">
+        Alleen voor keuring. Niet openbaar.
+      </p>
 
       <button
         type="button"
