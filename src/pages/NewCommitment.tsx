@@ -11,7 +11,7 @@ import { PROOF_LABELS, type ProofType } from "../lib/types";
 
 type Step = "write" | "amount" | "deadline" | "contract" | "sign" | "done";
 
-const PROOF_CHOICES = ["photo", "photo_pair", "video"] as const;
+const PROOF_CHOICES = ["photo", "photo_pair"] as const;
 
 /** Product: bewijs mag maximaal 30 dagen vooruit liggen. */
 const MAX_DEADLINE_DAYS = 30;
@@ -59,7 +59,8 @@ function deadlineError(value: string): string | null {
 
 function phaseOf(step: Step): { n: number; label: string } {
   if (step === "write") return { n: 1, label: "Belofte" };
-  if (step === "amount" || step === "deadline") return { n: 2, label: "Inzet" };
+  if (step === "amount") return { n: 2, label: "Inzet" };
+  if (step === "deadline") return { n: 2, label: "Deadline" };
   return { n: 3, label: "Vastzetten" };
 }
 
@@ -103,11 +104,7 @@ export function NewCommitmentPage() {
   const [lockedId, setLockedId] = useState<string | null>(null);
 
   const kind: ProofType =
-    proofType === "photo_pair"
-      ? "photo_pair"
-      : proofType === "video"
-        ? "video"
-        : "photo";
+    proofType === "photo_pair" ? "photo_pair" : "photo";
   const gate = promiseGate(promiseText, evidenceRule);
   const canWrite =
     promiseText.trim().length >= 8 &&
@@ -223,9 +220,10 @@ export function NewCommitmentPage() {
             ))}
           </div>
           <p className="mt-2 text-xs leading-5 text-mute">
-            Foto = een beeld. Foto voor + na = begin en eind. Video =
-            beweging, zoals opdrukken. Video kan nu niet worden beoordeeld;
-            kies foto als je zeker wilt zijn van een keuring.
+            Foto = een beeld. Foto voor + na = begin en eind.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-mute" aria-disabled="true">
+            Video volgt later — keuring kan dat nu niet eerlijk.
           </p>
           {gate.warn && !gate.block && (
             <p className="mt-4 text-sm text-mute">{gate.warn}</p>
@@ -252,7 +250,7 @@ export function NewCommitmentPage() {
         <>
           <h1 className="text-2xl font-semibold tracking-tight">Hoeveel zet je vast?</h1>
           <p className="mt-2 text-sm leading-6 text-mute">
-            {TRUST.feePass} {TRUST.feeFailLater} {TRUST.feeNow}
+            {TRUST.moneyLine}
           </p>
           <p className="mt-2 text-sm leading-6 text-mute">
             Bewijs moet voor de deadline binnen zijn. De regels zijn jouw
@@ -359,10 +357,12 @@ export function NewCommitmentPage() {
         <>
           <h1 className="text-2xl font-semibold tracking-tight">Teken je belofte</h1>
           <p className="mt-3 text-sm leading-6 text-mute">
-            Ik doe "{promiseText.trim()}" voor{" "}
-            {new Date(deadlineLocal).toLocaleString("nl-NL")}. {TRUST.feePass}{" "}
-            {TRUST.feeFailLater} {TRUST.feeNow} {TRUST.noGambling} Bewijs:{" "}
-            {evidenceRule.trim()}
+            Belofte: "{promiseText.trim()}" ·{" "}
+            {new Date(deadlineLocal).toLocaleString("nl-NL")}. {TRUST.noGambling}{" "}
+            Bewijs: {evidenceRule.trim()}
+          </p>
+          <p className="mt-3 text-sm font-medium">
+            Inzet: EUR {amount / 100} · {TRUST.feeNow}
           </p>
           <div className="mt-6">
             <SignPad onSignedChange={setSigned} />

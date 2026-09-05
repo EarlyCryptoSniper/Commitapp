@@ -7,6 +7,8 @@ export const TRUST = {
   feePass: "Haal je het, dan blijft het bedrag van jou.",
   feeFailLater:
     "Haal je het niet, dan volgt later een vergoeding. Nu niet. Wanneer betalen live gaat, hoor je dat vooraf.",
+  moneyLine:
+    "Nu wordt niets afgeschreven. Haal je het, dan blijft het bedrag van jou. Haal je het niet, dan volgt later een vergoeding — dat hoor je vooraf als betalen live gaat.",
   noGambling: "Geen kansspel. Je zet een belofte aan jezelf vast.",
   age18: "18+",
   refereeWho: "Een AI-scheidsrechter keurt je bewijs.",

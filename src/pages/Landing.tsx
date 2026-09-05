@@ -6,7 +6,7 @@ import { TRUST } from "../lib/trustCopy";
 const STEPS = [
   { n: "1", t: "Belofte", d: "Jij schrijft wat je doet.", to: "/hoe/belofte" },
   { n: "2", t: "Bewijs", d: "Een foto voor de deadline.", to: "/hoe/bewijs" },
-  { n: "3", t: "Uitkomst", d: `${TRUST.feePass} ${TRUST.feeFailLater}`, to: "/hoe/uitkomst" },
+  { n: "3", t: "Uitkomst", d: TRUST.moneyLine, to: "/hoe/uitkomst" },
 ];
 
 export function LandingPage() {
@@ -24,8 +24,7 @@ export function LandingPage() {
       </h1>
       <p className="mt-4 w-full max-w-[32rem] text-[15px] leading-7 text-mute break-words">
         Je schrijft wat je doet en levert een foto voor de deadline.{" "}
-        {TRUST.feePass} {TRUST.feeFailLater} {TRUST.feeNow} {TRUST.noGambling}{" "}
-        {TRUST.refereeWho} {TRUST.refereeHow}
+        {TRUST.moneyLine} {TRUST.noGambling} {TRUST.refereeWho} {TRUST.refereeHow}
       </p>
 
       {!supabaseConfigured && (

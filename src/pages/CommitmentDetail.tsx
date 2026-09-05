@@ -40,13 +40,27 @@ function euro(cents: number): string {
   return `EUR ${(cents / 100).toFixed(0)}`;
 }
 
-function nudge(status: Commitment["status"]): string {
-  if (status === "locked") return "Nog tijd. Jij kunt dit.";
+function nudge(
+  status: Commitment["status"],
+  beforeDeadline: boolean
+): string {
+  if (status === "locked") {
+    return beforeDeadline
+      ? "Nog tijd. Jij kunt dit."
+      : "Deadline voorbij. Bewijs insturen kan niet meer.";
+  }
   if (status === "reviewing") return "Bewijs is binnen. Even wachten op de keuring.";
   if (status === "completed") return "Gehaald. Mooi werk.";
-  if (status === "insufficient_evidence")
-    return "Nog niet overtuigend. Voor de deadline mag je opnieuw.";
-  if (status === "failed") return "Nog niet gehaald. Voor de deadline mag je opnieuw.";
+  if (status === "insufficient_evidence") {
+    return beforeDeadline
+      ? "Nog niet overtuigend. Voor de deadline mag je opnieuw."
+      : "Nog niet overtuigend. De deadline is voorbij.";
+  }
+  if (status === "failed") {
+    return beforeDeadline
+      ? "Nog niet gehaald. Voor de deadline mag je opnieuw."
+      : "Niet gehaald. De deadline is voorbij.";
+  }
   return "";
 }
 
@@ -167,7 +181,7 @@ export function CommitmentDetailPage() {
         <p className="mt-5 text-[11px] font-medium uppercase tracking-[0.16em] text-accent">
           {STATUS_LABELS[item.status]}
         </p>
-        <p className="mt-2 text-sm leading-6">{nudge(item.status)}</p>
+        <p className="mt-2 text-sm leading-6">{nudge(item.status, beforeDeadline)}</p>
         {why && item.status !== "locked" && (
           <p className="mt-4 border-t border-line pt-4 text-sm leading-6">{why}</p>
         )}
