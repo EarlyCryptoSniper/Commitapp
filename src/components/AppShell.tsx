@@ -19,8 +19,8 @@ export function AppShell() {
           to="/"
           aria-label="Home"
           aria-current={onHome ? "page" : undefined}
-          className={`shrink-0 py-1 text-lg font-semibold tracking-tight ${
-            onHome ? "text-accent" : "text-white"
+          className={`shrink-0 py-1 text-lg font-semibold tracking-tight text-accent ${
+            onHome ? "underline decoration-accent/60 underline-offset-4" : ""
           }`}
         >
           LockIn

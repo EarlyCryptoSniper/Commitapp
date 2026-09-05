@@ -5,6 +5,20 @@ import { useAuth } from "../lib/AuthContext";
 
 type Mode = "login" | "signup" | "magic";
 
+function authError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : "";
+  const t = raw.toLowerCase();
+  if (t.includes("invalid login")) return "E-mail of wachtwoord klopt niet.";
+  if (t.includes("email not confirmed")) return "Bevestig eerst je e-mail.";
+  if (t.includes("user already registered")) return "Dit e-mailadres heeft al een account.";
+  if (t.includes("signups not allowed")) return "Registreren staat nu uit.";
+  if (t.includes("rate limit") || t.includes("too many")) return "Te veel pogingen. Wacht even.";
+  if (t.includes("user not found") || t.includes("otp")) {
+    return "Geen account met dit e-mailadres, of de link is verlopen.";
+  }
+  return "Lukt niet. Check e-mail/wachtwoord of probeer later.";
+}
+
 const TABS: { id: Mode; label: string }[] = [
   { id: "login", label: "Inloggen" },
   { id: "magic", label: "Link per e-mail" },
@@ -64,7 +78,7 @@ export function AuthPage() {
         setMessage("Check je inbox voor de link.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Er ging iets mis.");
+      setError(authError(err));
     } finally {
       setBusy(false);
     }
@@ -76,6 +90,9 @@ export function AuthPage() {
         {mode === "signup" ? "Account maken" : "Inloggen"}
       </h1>
       <p className="mt-2 text-sm leading-6 text-mute">
+        Log in om beloftes vast te zetten en bij te houden.
+      </p>
+      <p className="mt-1 text-sm leading-6 text-mute">
         {mode === "magic"
           ? "We sturen een loginlink. Nieuw? Kies Account maken."
           : mode === "signup"

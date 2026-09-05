@@ -1,14 +1,17 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { DeadlinePicker } from "../components/DeadlinePicker";
+import { SignPad } from "../components/SignPad";
 import { createCommitmentDraft, lockCommitment } from "../lib/lockin";
+import { CONTRACT } from "../lib/contractCopy";
+import { PROMISE_EXAMPLES } from "../lib/promiseExamples";
 import { promiseGate } from "../lib/promisePolicy";
 import { TRUST } from "../lib/trustCopy";
 import { PROOF_LABELS, type ProofType } from "../lib/types";
 
 type Step = "write" | "amount" | "deadline" | "contract" | "sign" | "done";
 
-const STEPS: Step[] = ["write", "amount", "deadline", "contract", "sign", "done"];
-const PROOF_CHOICES = ["photo", "photo_pair"] as const;
+const PROOF_CHOICES = ["photo", "photo_pair", "video"] as const;
 
 /** Product: bewijs mag maximaal 30 dagen vooruit liggen. */
 const MAX_DEADLINE_DAYS = 30;
@@ -54,31 +57,38 @@ function deadlineError(value: string): string | null {
   return null;
 }
 
+function phaseOf(step: Step): { n: number; label: string } {
+  if (step === "write") return { n: 1, label: "Belofte" };
+  if (step === "amount" || step === "deadline") return { n: 2, label: "Inzet" };
+  return { n: 3, label: "Vastzetten" };
+}
+
 function StepMark({ step }: { step: Step }) {
-  const i = STEPS.indexOf(step);
+  const phase = phaseOf(step);
   return (
     <div className="mb-6">
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-mute">
-        Stap {i + 1} van {STEPS.length}
+        Fase {phase.n} van 3 · {phase.label}
       </p>
       <div className="mt-2 flex gap-1.5" aria-hidden>
-        {STEPS.map((id, n) => (
+        {[1, 2, 3].map((n) => (
           <span
-            key={id}
+            key={n}
             className={`h-1.5 flex-1 rounded-full ${
-              n <= i ? "bg-accent" : "bg-line"
+              n <= phase.n ? "bg-accent" : "bg-line"
             }`}
           />
         ))}
       </div>
+      <p className="mt-2 text-xs leading-5 text-mute">
+        Foto insturen doe je na het vastzetten.
+      </p>
     </div>
   );
 }
 
 export function NewCommitmentPage() {
   const navigate = useNavigate();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
   const [signed, setSigned] = useState(false);
 
   const [step, setStep] = useState<Step>("write");
@@ -92,7 +102,12 @@ export function NewCommitmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [lockedId, setLockedId] = useState<string | null>(null);
 
-  const kind: ProofType = proofType === "photo_pair" ? "photo_pair" : "photo";
+  const kind: ProofType =
+    proofType === "photo_pair"
+      ? "photo_pair"
+      : proofType === "video"
+        ? "video"
+        : "photo";
   const gate = promiseGate(promiseText, evidenceRule);
   const canWrite =
     promiseText.trim().length >= 8 &&
@@ -101,25 +116,11 @@ export function NewCommitmentPage() {
   const bounds = deadlineBounds();
   const timeError = deadlineError(deadlineLocal);
 
-  function paint(e: React.PointerEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.strokeStyle = "#39ff14";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-  }
-
-  function clearSign() {
-    const canvas = canvasRef.current;
-    canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-    setSigned(false);
+  function applyExample(id: string) {
+    const example = PROMISE_EXAMPLES.find((item) => item.id === id);
+    if (!example) return;
+    setPromiseText(example.promiseText);
+    setEvidenceRule(example.evidenceRule);
   }
 
   function goContract() {
@@ -164,9 +165,22 @@ export function NewCommitmentPage() {
         <>
           <h1 className="text-2xl font-semibold tracking-tight">Wat beloof je?</h1>
           <p className="mt-2 text-sm leading-6 text-mute">
-            Schrijf wat je wél doet, en hoe je dat op een foto laat zien.
+            Schrijf wat je wel doet, en hoe je dat op een foto laat zien.
             Geen "ik doe X niet".
           </p>
+          <p className="mt-5 text-xs font-medium text-mute">Voorbeelden</p>
+          <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+            {PROMISE_EXAMPLES.map((example) => (
+              <button
+                key={example.id}
+                type="button"
+                onClick={() => applyExample(example.id)}
+                className="rounded-full border border-line px-3 py-1.5 text-xs text-mute"
+              >
+                {example.label}
+              </button>
+            ))}
+          </div>
           <label htmlFor="promise-text" className="mt-7 block text-xs font-medium text-mute">
             Belofte
           </label>
@@ -176,7 +190,7 @@ export function NewCommitmentPage() {
             onChange={(e) => setPromiseText(e.target.value)}
             rows={4}
             maxLength={280}
-            placeholder="Bijvoorbeeld: ik ruim mijn bureau op vóór morgen 07:00."
+            placeholder="Bijvoorbeeld: ik ruim mijn bureau op voor morgen 07:00."
             className={fieldClass}
           />
           <label htmlFor="evidence-rule" className="mt-5 block text-xs font-medium text-mute">
@@ -209,7 +223,9 @@ export function NewCommitmentPage() {
             ))}
           </div>
           <p className="mt-2 text-xs leading-5 text-mute">
-            Bewijs is foto of foto voor + na. Video kan nu niet worden beoordeeld.
+            Foto = een beeld. Foto voor + na = begin en eind. Video =
+            beweging, zoals opdrukken. Video kan nu niet worden beoordeeld;
+            kies foto als je zeker wilt zijn van een keuring.
           </p>
           {gate.warn && !gate.block && (
             <p className="mt-4 text-sm text-mute">{gate.warn}</p>
@@ -239,7 +255,7 @@ export function NewCommitmentPage() {
             {TRUST.feePass} {TRUST.feeFailLater} {TRUST.feeNow}
           </p>
           <p className="mt-2 text-sm leading-6 text-mute">
-            Bewijs moet vóór de deadline binnen zijn. De regels zijn jouw
+            Bewijs moet voor de deadline binnen zijn. De regels zijn jouw
             bewijseis, niet dit bedrag.
           </p>
           <div className="mt-7 grid grid-cols-2 gap-3">
@@ -254,7 +270,7 @@ export function NewCommitmentPage() {
                     : "border-line bg-panel text-mute"
                 }`}
               >
-                €{v / 100}
+                EUR {v / 100}
               </button>
             ))}
           </div>
@@ -274,28 +290,20 @@ export function NewCommitmentPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Tot wanneer?</h1>
           <p className="mt-2 text-sm leading-6 text-mute">
             Jij kiest tot wanneer het bewijs binnen moet zijn. Voorstel:
-            morgen 07:00 — pas gerust aan.
+            morgen 07:00 - pas gerust aan.
           </p>
-          <label htmlFor="commitment-deadline" className="mt-7 block text-xs font-medium text-mute">
-            Bewijs vóór
-          </label>
-          <input
-            id="commitment-deadline"
-            type="datetime-local"
-            min={bounds.min}
-            max={bounds.max}
-            value={deadlineLocal}
-            onChange={(e) => {
-              setDeadlineLocal(e.target.value);
-              setDeadlineHint(deadlineError(e.target.value));
-            }}
-            className={`${fieldClass} min-h-[3.5rem]`}
-          />
-          {(deadlineHint || timeError) && (
-            <p className="mt-2 text-sm text-danger" role="alert" aria-live="polite">
-              {deadlineHint ?? timeError}
-            </p>
-          )}
+          <div className="mt-7">
+            <DeadlinePicker
+              value={deadlineLocal}
+              min={bounds.min}
+              max={bounds.max}
+              error={deadlineHint ?? timeError}
+              onChange={(next) => {
+                setDeadlineLocal(next);
+                setDeadlineHint(deadlineError(next));
+              }}
+            />
+          </div>
           <div className="mt-8 flex gap-3">
             <button type="button" onClick={() => setStep("amount")} className={secondaryBtn}>
               Terug
@@ -314,7 +322,7 @@ export function NewCommitmentPage() {
 
       {step === "contract" && (
         <>
-          <h1 className="text-2xl font-semibold tracking-tight">Bewijscontract</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{CONTRACT.title}</h1>
           <p className="mt-2 text-sm leading-6 text-mute">
             {promiseText.trim()} · {PROOF_LABELS[kind]}. Dit wordt vastgezet bij
             je handtekening. Geen vrije interpretatie achteraf.
@@ -322,26 +330,10 @@ export function NewCommitmentPage() {
           <dl className="mt-6 space-y-4">
             {(
               [
-                [
-                  "Gehaald",
-                  evidenceRule.trim()
-                    ? `${evidenceRule.trim()} Dat toont de belofte.`
-                    : "Bewijs voldoet aan je bewijseis en toont de belofte.",
-                ],
-                [
-                  "Niet gehaald",
-                  "Bewijs toont aantoonbaar dat de belofte niet is nagekomen.",
-                ],
-                [
-                  "Onvoldoende",
-                  "Bewijs ontbreekt, is onleesbaar, of niet hard genoeg. Twijfel = onvoldoende. Geen cadeau-PASS.",
-                ],
-                [
-                  "Opdrachtcode",
-                  kind === "photo_pair"
-                    ? "LOCKIN-code leesbaar op de na-foto."
-                    : "LOCKIN-code leesbaar in de foto.",
-                ],
+                [CONTRACT.passedTitle, CONTRACT.passedBody],
+                [CONTRACT.failedTitle, CONTRACT.failedBody],
+                [CONTRACT.insufficientTitle, CONTRACT.insufficientBody],
+                ["Opdrachtcode", CONTRACT.lockinNote],
               ] as const
             ).map(([label, body]) => (
               <div key={label} className="rounded-2xl border border-line bg-panel px-4 py-4">
@@ -357,7 +349,7 @@ export function NewCommitmentPage() {
               Terug
             </button>
             <button type="button" onClick={() => setStep("sign")} className={primaryBtn}>
-              Ik snap het
+              Verder naar handtekening
             </button>
           </div>
         </>
@@ -372,35 +364,9 @@ export function NewCommitmentPage() {
             {TRUST.feeFailLater} {TRUST.feeNow} {TRUST.noGambling} Bewijs:{" "}
             {evidenceRule.trim()}
           </p>
-          <canvas
-            ref={canvasRef}
-            width={360}
-            height={160}
-            role="img"
-            aria-label="Handtekening"
-            className="mt-6 w-full max-w-full min-w-0 touch-none rounded-2xl border border-line bg-panel"
-            onPointerDown={(e) => {
-              drawing.current = true;
-              canvasRef.current?.getContext("2d")?.beginPath();
-              paint(e);
-            }}
-            onPointerMove={(e) => {
-              if (drawing.current) {
-                paint(e);
-                setSigned(true);
-              }
-            }}
-            onPointerUp={() => {
-              drawing.current = false;
-            }}
-          />
-          <button
-            type="button"
-            onClick={clearSign}
-            className="mt-2 text-xs text-mute"
-          >
-            Wis handtekening
-          </button>
+          <div className="mt-6">
+            <SignPad onSignedChange={setSigned} />
+          </div>
           {error && (
             <p className="mt-3 text-sm text-danger" role="alert" aria-live="polite">
               {error}
@@ -430,7 +396,7 @@ export function NewCommitmentPage() {
             {new Date(deadlineLocal).toLocaleString("nl-NL")}
           </p>
           <p className="mt-1 text-xs text-mute">
-            €{amount / 100} · {TRUST.feeNow}
+            EUR {amount / 100} · {TRUST.feeNow}
           </p>
           <button
             type="button"

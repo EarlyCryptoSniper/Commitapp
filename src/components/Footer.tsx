@@ -7,7 +7,7 @@ export function Footer() {
       <p>{TRUST.footerLine}</p>
       <Link
         to="/faq"
-        className="mt-2 inline-block text-mute underline-offset-2 hover:text-white hover:underline"
+        className="mt-3 inline-block text-sm font-semibold text-accent underline-offset-2 hover:underline"
       >
         Vragen
       </Link>

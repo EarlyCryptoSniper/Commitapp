@@ -8,6 +8,9 @@ const DISALLOWED =
 const NEGATIVE =
   /\b(geen|niet|nooit)\s+(meer\s+)?(takeaway|thuisbezorgd|alcohol|roken|sigaret|drugs|tiktok|snoep|fastfood|bestellen)\b|\bik\s+(doe|ga|zal|eet|drink|kijk|gebruik)\s+(geen|niet|nooit)\b|\bnooit\s+meer\b/i;
 
+const HEDGE =
+  /onzeker|twijfel|misschien|waarschijnlijk|lijkt|kan zijn|ongeveer|niet duidelijk|moeilijk te zien|denk ik/i;
+
 const TASK_NL: Record<string, string> = {
   workout: "Sporten",
   desk: "Bureau afronden",
@@ -19,8 +22,31 @@ const TASK_NL: Record<string, string> = {
 /**
  * VIDEO POLICY (Path B): gpt-4o-mini vision has no reliable video input
  * in this edge stack (no ffmpeg frames). Video proofs → insufficient + NL.
- * Later pass: hide video as proof_type in NewCommitment.tsx. Do not edit that here.
+ *
+ * False-PASS (2026-09-05): a balcony object was marked passed while it did
+ * not match the frozen belofte/bewijseis. Prefer insufficient over passed.
  */
+
+const SYSTEM = `Je bent een strenge LockIn-scheidsrechter. Antwoord ALLEEN als JSON-object met keys overall en reason. overall is alleen "passed", "failed" of "insufficient". reason is één korte Nederlandse zin. Geen Engels. Geen extra keys. JSON.
+
+passed ALLEEN als BEIDE waar zijn:
+1) De foto toont overduidelijk de belofte volgens de bewijseis.
+2) De LOCKIN-code is leesbaar als die vereist is.
+
+NOOIT passed als:
+- de code zichtbaar is maar de belofte niet
+- een willekeurig voorwerp, balkon, kamer of persoon dat niet de belofte is
+- de scène "iets" toont dat erop zou kunnen lijken
+- je moet raden wat de gebruiker bedoelde
+- de foto ongerelateerd is
+
+Voorbeelden (anti-cadeau-PASS):
+- Belofte "bureau afruimen", foto van een plant op een balkon → insufficient
+- Belofte "10 keer opdrukken", foto met alleen LOCKIN-code → insufficient
+- Belofte "mediteren 10 min", willekeurige selfie zonder timer/houding → insufficient
+
+failed ALLEEN als het beeld aantoont dat de belofte NIET is nagekomen (zelfde plek duidelijk niet gedaan).
+Twijfel, andere plek, onleesbaar, of "zou kunnen" → insufficient. Nooit cadeau-PASS.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -127,7 +153,7 @@ Deno.serve(async (req) => {
       ? `LOCKIN ${commitment.challenge_code}`
       : "unknown";
 
-    const contract = `Belofte (bevroren):\n${promise || "—"}\n\nBewijseis (bevroren):\n${rule || "—"}\n\nRegels:\n- Beoordeel ALLEEN deze belofte + bewijseis + LOCKIN-code.\n- PASS alleen als het bewijs de belofte aantoont volgens de bewijseis én de code leesbaar is als die hoort.\n- FAIL alleen als het bewijs aantoont dat de belofte niet is gehaald.\n- INSUFFICIENT bij twijfel, onleesbaar, ontbrekend, of een negatief dat je niet kunt bewijzen.\n- Code alleen is nooit PASS.\n- Geweld, illegaliteit, zelfbeschadiging, seksuele uitbuiting, haat, gevaarlijke challenges: overall=insufficient, reason="Deze belofte of dit bewijs laten we niet toe."`;
+    const contract = `Belofte (bevroren):\n${promise || "-"}\n\nBewijseis (bevroren):\n${rule || "-"}\n\nChallenge: ${challenge}\n\nRegels:\n- Beoordeel ALLEEN deze belofte + bewijseis + LOCKIN-code.\n- passed alleen als het beeld de belofte HARD aantoont volgens de bewijseis EN de code leesbaar is als die hoort.\n- failed alleen als het beeld aantoont dat de belofte niet is nagekomen.\n- insufficient bij twijfel, ongerelateerde foto, andere plek, onleesbaar, of code-alleen.\n- LOCKIN-code alleen is nooit passed.\n- Een balkon, plant of willekeurig voorwerp is nooit passed als dat niet de belofte is.`;
 
     const ai = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -140,17 +166,13 @@ Deno.serve(async (req) => {
         temperature: 0,
         response_format: { type: "json_object" },
         messages: [
-          {
-            role: "system",
-            content:
-              'Je bent een strenge LockIn-scheidsrechter. Antwoord altijd als JSON-object met exact deze keys: overall, reason. overall is alleen "passed", "failed" of "insufficient". reason is één korte Nederlandse zin. Geen extra keys. Twijfel = insufficient. Nooit cadeau-PASS. JSON.',
-          },
+          { role: "system", content: SYSTEM },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Contract:\n${contract}\nChallenge: ${challenge}\nEerste beeld is BEFORE, tweede is AFTER (als er twee zijn).\nBeoordeel de deadline niet. Antwoord als JSON.`,
+                text: `${contract}\nEerste beeld is BEFORE, tweede is AFTER (als er twee zijn).\nBeoordeel de deadline niet. Antwoord als JSON.`,
               },
               ...imageUrls.map((img) => ({
                 type: "image_url",
@@ -201,16 +223,23 @@ function parseVerdict(content: string): {
       overall?: string;
       reason?: string;
     };
-    const overall = normalize(obj.overall);
-    const reason =
+    let overall = normalize(obj.overall);
+    let reason =
       typeof obj.reason === "string" && obj.reason.trim()
         ? obj.reason.trim().slice(0, 240)
         : fallbackReason(overall);
+    reason = reason.replace(/\b(PASS|FAIL|PASSED|FAILED)\b/gi, "").trim();
+    if (!reason) reason = fallbackReason(overall);
+
     if (DISALLOWED.test(reason)) {
       return {
         overall: "insufficient",
         reason: "Deze belofte of dit bewijs laten we niet toe.",
       };
+    }
+    if (overall === "passed" && HEDGE.test(reason)) {
+      overall = "insufficient";
+      reason = "Het bewijs toont de belofte niet hard genoeg.";
     }
     return { overall, reason };
   } catch {

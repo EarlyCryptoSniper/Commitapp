@@ -262,11 +262,13 @@ export function ProofPage() {
   }
 
   const ready = Boolean(shot);
-  const hint = before && !shot
-    ? "Voor-foto klaar. Nu de na-foto."
-    : shot
-      ? "Mooi. Insturen als het beeld scherp is."
-      : "Houd de opdrachtcode in beeld. Jij kunt dit.";
+  const hint = !camOn
+    ? "Houd de opdrachtcode in beeld als je fotografeert."
+    : before && !shot
+      ? "Voor-foto klaar. Nu de na-foto."
+      : shot
+        ? "Mooi. Insturen als het beeld scherp is."
+        : "Houd de opdrachtcode in beeld. Jij kunt dit.";
 
   return (
     <section className="w-full min-w-0">
@@ -290,7 +292,7 @@ export function ProofPage() {
         )}
         {!camOn && (
           <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-mute">
-            Tik Camera starten.
+            Camera staat uit.
           </p>
         )}
       </div>
