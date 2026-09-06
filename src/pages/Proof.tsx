@@ -20,7 +20,6 @@ export function ProofPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -155,33 +154,6 @@ export function ProofPage() {
     await snap(row.proof_type === "photo_pair" ? "after" : "proof", mark);
   }
 
-  function pickGallery() {
-    fileRef.current?.click();
-  }
-
-  async function onGallery(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !item) return;
-    if (item.proof_type === "photo_pair" && !before) {
-      applyFile(file, "before");
-      return;
-    }
-    if (item.proof_type !== "photo_pair" || Boolean(before)) {
-      if (!code || !expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
-        try {
-          const ch = await issueChallenge(item.id);
-          setCode(ch.code);
-          setExpiresAt(ch.expiresAt);
-        } catch (err) {
-          setError(humanError(err));
-          return;
-        }
-      }
-    }
-    applyFile(file, item.proof_type === "photo_pair" ? "after" : "proof");
-  }
-
   async function submit() {
     if (!item) return;
     setBusy(true);
@@ -193,7 +165,7 @@ export function ProofPage() {
       let path: string;
       if (item.proof_type === "photo_pair") {
         if (!before || !shot) {
-          throw new Error("Maak of kies een foto voor en een foto na.");
+          throw new Error("Maak een foto voor en een foto na.");
         }
         await uploadProofFile({
           commitmentId: item.id,
@@ -206,7 +178,7 @@ export function ProofPage() {
           slot: "after",
         });
       } else {
-        if (!shot) throw new Error("Maak of kies eerst bewijs.");
+        if (!shot) throw new Error("Maak eerst een foto.");
         path = await uploadProofFile({
           commitmentId: item.id,
           file: shot,
@@ -292,19 +264,9 @@ export function ProofPage() {
     void takeAfter(row);
   }
 
-  const galleryLabel = shot
-    ? "Andere uit galerij"
-    : row.proof_type === "video"
-      ? "Kies video uit galerij"
-      : row.proof_type === "photo_pair" && !before
-        ? "Kies voor-foto uit galerij"
-        : row.proof_type === "photo_pair"
-          ? "Kies na-foto uit galerij"
-          : "Kies foto uit galerij";
-
   const ready = Boolean(shot);
   const hint = !camOn
-    ? "Houd de opdrachtcode in beeld als je fotografeert. Of kies een bestaande foto — zorg dat LOCKIN-code leesbaar is."
+    ? "Start de camera. Houd de opdrachtcode in beeld."
     : before && !shot
       ? "Voor-foto klaar. Nu de na-foto."
       : shot
@@ -313,13 +275,6 @@ export function ProofPage() {
 
   return (
     <section className="w-full min-w-0">
-      <input
-        ref={fileRef}
-        type="file"
-        accept={row.proof_type === "video" ? "video/*" : "image/*"}
-        className="sr-only"
-        onChange={onGallery}
-      />
       <div className="relative -mx-4 overflow-hidden bg-black">
         <video
           ref={videoRef}
@@ -365,7 +320,7 @@ export function ProofPage() {
         ) : (
           <img
             src={preview}
-            alt="Gekozen bewijs"
+            alt="Gemaakt bewijs"
             className="mt-3 h-14 w-14 rounded-xl object-cover"
           />
         ))}
@@ -391,14 +346,6 @@ export function ProofPage() {
         }`}
       >
         {primaryLabel}
-      </button>
-
-      <button
-        type="button"
-        onClick={pickGallery}
-        className="mt-3 w-full rounded-full border border-line py-3.5 text-sm text-mute"
-      >
-        {galleryLabel}
       </button>
 
       <button
