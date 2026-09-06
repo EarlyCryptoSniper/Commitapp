@@ -151,12 +151,14 @@ export async function fetchProofSignedUrl(
 
 export async function finalizeProof(
   id: string,
-  storagePath: string
+  storagePath: string,
+  challengeCode: string
 ): Promise<Commitment> {
   const db = requireSupabase();
   const { data, error } = await db.rpc("finalize_proof", {
     p_commitment_id: id,
     p_storage_path: storagePath,
+    p_challenge_code: challengeCode,
   });
   if (error) throw error;
   return data as Commitment;
@@ -186,6 +188,43 @@ export async function retryProof(id: string): Promise<Commitment> {
   return data as Commitment;
 }
 
+export type GateVerdict = {
+  verdict: "ok" | "warn" | "block";
+  message: string;
+};
+
+export async function gatePromise(
+  promiseText: string,
+  evidenceRule: string
+): Promise<GateVerdict> {
+  const open: GateVerdict = { verdict: "ok", message: "" };
+  try {
+    const db = requireSupabase();
+    const { data, error } = await db.functions.invoke("gate-promise", {
+      body: {
+        promise_text: promiseText,
+        evidence_rule: evidenceRule,
+      },
+    });
+    if (error) return open;
+    const payload = data as GateVerdict | null;
+    if (
+      !payload ||
+      (payload.verdict !== "ok" &&
+        payload.verdict !== "warn" &&
+        payload.verdict !== "block")
+    ) {
+      return open;
+    }
+    return {
+      verdict: payload.verdict,
+      message: typeof payload.message === "string" ? payload.message : "",
+    };
+  } catch {
+    return open;
+  }
+}
+
 export async function requestReview(commitmentId: string): Promise<void> {
   const db = requireSupabase();
   const { data, error } = await db.functions.invoke("review-proof", {
@@ -210,8 +249,8 @@ function extFromFile(file: File): string {
   }
   if (file.type === "image/jpeg") return "jpg";
   if (file.type === "image/png") return "png";
-  if (file.type === "image/webp") return "webp";
   if (file.type === "video/mp4") return "mp4";
   if (file.type === "video/quicktime") return "mov";
+  if (file.type === "image/webp") return "webp";
   return "bin";
 }

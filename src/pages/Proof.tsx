@@ -214,7 +214,7 @@ export function ProofPage() {
         });
       }
       stopCam();
-      await finalizeProof(item.id, path);
+      await finalizeProof(item.id, path, code ?? "");
       try {
         await requestReview(item.id);
       } catch {
