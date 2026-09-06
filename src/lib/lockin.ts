@@ -74,6 +74,9 @@ export async function createCommitmentDraft(input: {
   proofType: ProofType;
   timezone?: string;
 }): Promise<Commitment> {
+  if (input.proofType !== "photo" && input.proofType !== "photo_pair") {
+    throw new Error("invalid proof type");
+  }
   const db = requireSupabase();
   const { data, error } = await db.rpc("create_commitment_draft", {
     p_amount_cents: input.amountCents,
